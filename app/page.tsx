@@ -1978,6 +1978,7 @@ export default function Home() {
                 {current.choices.map((choice, index) => (
                   <button
                     key={choice.title}
+                    type="button"
                     className="choice-card"
                     data-testid={`choice-${index}`}
                     onClick={() => choose(choice)}
