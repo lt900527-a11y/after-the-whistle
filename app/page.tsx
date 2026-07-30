@@ -815,6 +815,46 @@ export default function Home() {
             </div>
           </section>
 
+          <section className="mobile-career-summary" aria-label="球员快速状态">
+            <div className="mobile-player-id">
+              {currentClub ? (
+                <TeamCrest club={currentClub.team} size={44} />
+              ) : (
+                <div className="mobile-position">{game.position}</div>
+              )}
+              <div>
+                <span>{game.nationality} · {age} 岁</span>
+                <strong>{game.name}</strong>
+                <small>{game.club}</small>
+              </div>
+            </div>
+            <div className="mobile-quick-stats">
+              <div>
+                <span>能力</span>
+                <strong>{game.ovr}</strong>
+              </div>
+              <div>
+                <span>体能</span>
+                <strong>{game.energy}</strong>
+              </div>
+              <div>
+                <span>名气</span>
+                <strong>{game.reputation}</strong>
+              </div>
+              <div>
+                <span>身价</span>
+                <strong>
+                  {game.value >= 1000
+                    ? `${(game.value / 1000).toFixed(1)}亿`
+                    : `${game.value}万`}
+                </strong>
+              </div>
+            </div>
+            <button onClick={() => setShowClubPicker(true)}>
+              转会中心 <span aria-hidden="true">↗</span>
+            </button>
+          </section>
+
           <div className="career-grid">
             <aside className="player-panel">
               <div className="player-identity">
