@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { annualChapters } from "./annual-chapters";
 import {
   findRealWorldEvent,
@@ -8,7 +8,6 @@ import {
   type CameoChoice,
 } from "./real-world-events";
 import {
-  allClubs,
   confederations,
   evaluateSeasonAwards,
   findClub,
@@ -81,6 +80,7 @@ const origins = [
   {
     id: "街头",
     mark: "01",
+    icon: "⚡",
     title: "街头野球",
     copy: "球感是天生的，战术纪律得慢慢补。",
     bonus: "技术 +3 · 名气 +4",
@@ -88,6 +88,7 @@ const origins = [
   {
     id: "青训",
     mark: "02",
+    icon: "◆",
     title: "职业青训",
     copy: "你熟悉体系，也习惯每周都被淘汰一次。",
     bonus: "能力 +2 · 信任 +8",
@@ -95,18 +96,19 @@ const origins = [
   {
     id: "校园",
     mark: "03",
+    icon: "▲",
     title: "校园联赛",
     copy: "没人替你铺路，但你很会在逆风里踢球。",
     bonus: "体能 +8 · 士气 +6",
   },
 ];
 
-const positions: { id: Position; name: string; hint: string }[] = [
-  { id: "ST", name: "中锋", hint: "终结比赛" },
-  { id: "LW", name: "左边锋", hint: "速度突破" },
-  { id: "CAM", name: "前腰", hint: "创造机会" },
-  { id: "CM", name: "中场", hint: "控制节奏" },
-  { id: "CB", name: "中卫", hint: "守住底线" },
+const positions: { id: Position; name: string; hint: string; number: string }[] = [
+  { id: "ST", name: "中锋", hint: "终结", number: "9" },
+  { id: "LW", name: "边锋", hint: "突破", number: "11" },
+  { id: "CAM", name: "前腰", hint: "创造", number: "10" },
+  { id: "CM", name: "中场", hint: "掌控", number: "8" },
+  { id: "CB", name: "中卫", hint: "防守", number: "4" },
 ];
 
 const legacyChapters: Chapter[] = [
@@ -405,7 +407,6 @@ const clamp = (value: number, min = 0, max = 99) =>
 export default function Home() {
   const [game, setGame] = useState<GameState>(baseState);
   const [loaded, setLoaded] = useState(false);
-  const [showRules, setShowRules] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [showClubPicker, setShowClubPicker] = useState(false);
   const [activeConfederation, setActiveConfederation] =
@@ -648,141 +649,152 @@ export default function Home() {
         </div>
         <nav className="top-actions" aria-label="游戏操作">
           {game.phase !== "setup" && (
-            <button onClick={() => setShowReset(true)}>重新开档</button>
+            <button onClick={() => setShowReset(true)}>
+              <span aria-hidden="true">↺</span> 新生涯
+            </button>
           )}
-          <button onClick={() => setShowRules(true)}>玩法说明</button>
         </nav>
       </header>
 
       {game.phase === "setup" && (
         <main className="setup-page">
           <section className="setup-intro">
-            <p className="overline">一款关于选择的足球生涯文字游戏</p>
+            <div className="hero-status">
+              <span />
+              PLAYER CAREER
+            </div>
             <h1>
-              你只有一条命，
-              <br />
-              和一双球鞋。
+              踢出
+              <span>你的时代</span>
             </h1>
-            <p className="intro-copy">
-              从无人认识的 14 岁开始，一直到 42 岁，每一年都必须做出一次选择。它会改变能力、信任、名气，以及你最终成为什么样的球员。
-            </p>
-            <div className="quote-card">
-              <span>更衣室墙上的字</span>
-              <blockquote>“天赋让你被看见，选择决定你被如何记住。”</blockquote>
+            <div className="career-range">
+              <strong>14</strong>
+              <i />
+              <strong>42</strong>
+              <span>岁</span>
+            </div>
+            <div className="kit-showcase" aria-label="当前球队球衣">
+              {currentClub && (
+                <>
+                  <TeamKit club={currentClub.team} variant="hero" />
+                  <div className="showcase-club">
+                    <TeamCrest club={currentClub.team} size={66} />
+                    <span>{currentClub.league.country}</span>
+                    <strong>{currentClub.team.localName}</strong>
+                    <small>{currentClub.league.name}</small>
+                  </div>
+                </>
+              )}
             </div>
           </section>
 
           <section className="setup-card" aria-label="创建球员">
-            <div className="paper-corner">PLAYER FILE / 001</div>
             <div className="setup-heading">
-              <span>创建球员</span>
+              <div>
+                <span>创建球员</span>
+                <small>NEW PLAYER</small>
+              </div>
               <strong>01</strong>
             </div>
-            <label className="field-label" htmlFor="player-name">
-              你的名字
-            </label>
-            <input
-              id="player-name"
-              data-testid="player-name"
-              className="name-input"
-              value={game.name}
-              maxLength={8}
-              onChange={(event) =>
-                setGame((prev) => ({ ...prev, name: event.target.value }))
-              }
-              placeholder="输入球员姓名"
-            />
-
-            <p className="field-label">足球出身</p>
-            <div className="origin-grid">
-              {origins.map((origin) => (
-                <button
-                  key={origin.id}
-                  className={`origin-option ${game.origin === origin.id ? "selected" : ""}`}
-                  onClick={() =>
-                    setGame((prev) => ({ ...prev, origin: origin.id }))
-                  }
-                  aria-pressed={game.origin === origin.id}
-                >
-                  <span className="origin-num">{origin.mark}</span>
-                  <strong>{origin.title}</strong>
-                  <small>{origin.copy}</small>
-                  <em>{origin.bonus}</em>
-                </button>
-              ))}
+            <div className="setup-row name-row">
+              <span className="row-icon">ID</span>
+              <label htmlFor="player-name">姓名</label>
+              <input
+                id="player-name"
+                data-testid="player-name"
+                className="name-input"
+                value={game.name}
+                maxLength={8}
+                onChange={(event) =>
+                  setGame((prev) => ({ ...prev, name: event.target.value }))
+                }
+                placeholder="输入姓名"
+              />
             </div>
 
-            <p className="field-label">场上位置</p>
-            <div className="position-grid">
-              {positions.map((position) => (
-                <button
-                  key={position.id}
-                  className={game.position === position.id ? "selected" : ""}
-                  onClick={() =>
-                    setGame((prev) => ({ ...prev, position: position.id }))
-                  }
-                  aria-pressed={game.position === position.id}
-                >
-                  <strong>{position.id}</strong>
-                  <span>{position.name}</span>
-                  <small>{position.hint}</small>
-                </button>
-              ))}
-            </div>
-
-            <label className="field-label" htmlFor="national-team">
-              国家队资格
-            </label>
-            <select
-              id="national-team"
-              className="national-team-select"
-              value={game.nationality}
-              onChange={(event) => {
-                const nation = nationalTeams.find(
-                  (item) => item.name === event.target.value,
-                );
-                if (!nation) return;
-                setGame((prev) => ({
-                  ...prev,
-                  nationality: nation.name,
-                  nationalConfederation: nation.confederation,
-                }));
-              }}
-            >
-              {nationalTeams.map((nation) => (
-                <option value={nation.name} key={nation.name}>
-                  {nation.flag} {nation.name} · {nation.confederation}
-                </option>
-              ))}
-            </select>
-
-            <div className="club-start-row">
-              <div>
-                <p className="field-label">生涯起点 · 真实俱乐部</p>
-                <div className="selected-club">
-                  {currentClub && (
-                    <TeamCrest club={currentClub.team} size={52} />
-                  )}
-                  <div>
-                    <strong>{currentClub?.team.localName ?? game.club}</strong>
-                    <span>
-                      {currentClub
-                        ? `${currentClub.league.country} · ${currentClub.league.name}`
-                        : "尚未选择联赛"}
-                    </span>
-                    <small>
-                      {currentClub
-                        ? `${currentClub.league.band} · ${currentClub.team.level}`
-                        : "请选择你的第一站"}
-                    </small>
-                  </div>
-                </div>
+            <div className="setup-block">
+              <div className="block-title">
+                <span className="row-icon">POS</span>
+                <strong>位置</strong>
               </div>
+              <div className="position-grid">
+                {positions.map((position) => (
+                  <button
+                    key={position.id}
+                    className={game.position === position.id ? "selected" : ""}
+                    onClick={() =>
+                      setGame((prev) => ({ ...prev, position: position.id }))
+                    }
+                    aria-pressed={game.position === position.id}
+                  >
+                    <b>{position.number}</b>
+                    <strong>{position.id}</strong>
+                    <span>{position.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="setup-block">
+              <div className="block-title">
+                <span className="row-icon">DNA</span>
+                <strong>出身</strong>
+              </div>
+              <div className="origin-grid">
+                {origins.map((origin) => (
+                  <button
+                    key={origin.id}
+                    className={`origin-option ${game.origin === origin.id ? "selected" : ""}`}
+                    onClick={() =>
+                      setGame((prev) => ({ ...prev, origin: origin.id }))
+                    }
+                    aria-pressed={game.origin === origin.id}
+                  >
+                    <span className="origin-symbol">{origin.icon}</span>
+                    <strong>{origin.title}</strong>
+                    <em>{origin.bonus.replace(" · ", "  ")}</em>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="setup-split">
+              <label className="quick-select" htmlFor="national-team">
+                <span>国家队</span>
+                <select
+                  id="national-team"
+                  className="national-team-select"
+                  value={game.nationality}
+                  onChange={(event) => {
+                    const nation = nationalTeams.find(
+                      (item) => item.name === event.target.value,
+                    );
+                    if (!nation) return;
+                    setGame((prev) => ({
+                      ...prev,
+                      nationality: nation.name,
+                      nationalConfederation: nation.confederation,
+                    }));
+                  }}
+                >
+                  {nationalTeams.map((nation) => (
+                    <option value={nation.name} key={nation.name}>
+                      {nation.flag} {nation.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <button
                 className="club-picker-button"
                 onClick={() => setShowClubPicker(true)}
               >
-                全球选队 <span>{allClubs.length} 队 →</span>
+                {currentClub && <TeamKit club={currentClub.team} variant="mini" />}
+                <span>
+                  <small>俱乐部</small>
+                  <strong>{currentClub?.team.localName ?? game.club}</strong>
+                </span>
+                <b aria-hidden="true">›</b>
               </button>
             </div>
 
@@ -792,12 +804,9 @@ export default function Home() {
               onClick={startCareer}
               disabled={!game.name.trim()}
             >
-              <span>开始职业生涯</span>
-              <span aria-hidden="true">→</span>
+              <span>开球</span>
+              <span aria-hidden="true">▶</span>
             </button>
-            <p className="save-note">
-              <span className="pulse-dot" /> 进度会自动保存在这台设备
-            </p>
           </section>
         </main>
       )}
@@ -818,7 +827,7 @@ export default function Home() {
           <section className="mobile-career-summary" aria-label="球员快速状态">
             <div className="mobile-player-id">
               {currentClub ? (
-                <TeamCrest club={currentClub.team} size={44} />
+                <TeamKit club={currentClub.team} variant="mini" />
               ) : (
                 <div className="mobile-position">{game.position}</div>
               )}
@@ -857,6 +866,12 @@ export default function Home() {
 
           <div className="career-grid">
             <aside className="player-panel">
+              {currentClub && (
+                <div className="player-kit-card">
+                  <TeamKit club={currentClub.team} variant="card" />
+                  <TeamCrest club={currentClub.team} size={54} />
+                </div>
+              )}
               <div className="player-identity">
                 {currentClub ? (
                   <TeamCrest club={currentClub.team} size={58} />
@@ -1134,8 +1149,8 @@ export default function Home() {
       )}
 
       <footer className="site-footer">
-        <p>九十分钟后 · 原创足球文字生涯游戏</p>
-        <p>真实人物仅作文化联动 · 具体对话与互动均为游戏虚构</p>
+        <strong>90′</strong>
+        <span>AFTER THE WHISTLE</span>
       </footer>
 
       {activeCameo && (
@@ -1211,9 +1226,6 @@ export default function Home() {
             <h2 id="club-picker-title">
               {game.phase === "setup" ? "选择生涯第一站" : "选择下一支球队"}
             </h2>
-            <p className="picker-intro">
-              六大洲足联、{worldLeagues.length} 个联赛、{allClubs.length} 支真实球队。联赛强度影响世界奖项难度，但不会封死任何地区的传奇路线。
-            </p>
             <div className="confederation-tabs">
               {confederations.map((item) => (
                 <button
@@ -1268,6 +1280,7 @@ export default function Home() {
                             onClick={() => selectClub(team.id)}
                           >
                             <TeamCrest club={team} size={42} />
+                            <TeamKit club={team} variant="mini" />
                             <span>
                               <strong>{team.localName}</strong>
                               <small>{team.name}</small>
@@ -1280,73 +1293,6 @@ export default function Home() {
                   );
                 })}
             </div>
-            <p className="crest-note">
-              队徽由公开百科条目动态加载，仅作球队身份识别；本站与各俱乐部无商业关联。
-            </p>
-          </section>
-        </div>
-      )}
-
-      {showRules && (
-        <div className="modal-backdrop" role="presentation">
-          <section
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="rules-title"
-          >
-            <button
-              className="modal-close"
-              onClick={() => setShowRules(false)}
-              aria-label="关闭玩法说明"
-            >
-              ×
-            </button>
-            <p className="overline">HOW TO PLAY</p>
-            <h2 id="rules-title">一年一选择，二十九年生涯</h2>
-            <ol>
-              <li>
-                <span>01</span>
-                <p>
-                  <strong>创建你的球员</strong>
-                  出身和位置会决定不同的开局优势。
-                </p>
-              </li>
-              <li>
-                <span>02</span>
-                <p>
-                  <strong>每年处理一次关键时刻</strong>
-                  从 14 岁到 42 岁，每个选项都会改变能力、体能、信任、名气与数据。
-                </p>
-              </li>
-              <li>
-                <span>03</span>
-                <p>
-                  <strong>自己掌控转会</strong>
-                  可从六大洲 {worldLeagues.length} 个联赛的 {allClubs.length} 支真实球队中自由选择。非五大联赛会显示国家、赛事层级和球队定位。
-                </p>
-              </li>
-              <li>
-                <span>04</span>
-                <p>
-                  <strong>竞争真实足球荣誉</strong>
-                  联赛冠军、洲际冠军、世界杯、金球奖、国际足联年度最佳等会按赛季表现评选；任何大洲都有机会。
-                </p>
-              </li>
-              <li>
-                <span>05</span>
-                <p>
-                  <strong>触发现实足球联动</strong>
-                  部分年份会出现球星、庆祝动作和网络名梗。现实背景附有出处，具体互动属于虚构剧情。
-                </p>
-              </li>
-            </ol>
-            <button
-              className="primary-button"
-              onClick={() => setShowRules(false)}
-            >
-              明白，回到比赛 <span>→</span>
-            </button>
           </section>
         </div>
       )}
@@ -1378,6 +1324,75 @@ export default function Home() {
 }
 
 const crestCache = new Map<string, string>();
+
+const kitColorOverrides: Record<string, [string, string, string]> = {
+  shandong: ["#f14b38", "#ffffff", "#f4c63d"],
+  "shanghai-port": ["#d92f35", "#ffffff", "#111111"],
+  "beijing-guoan": ["#1ba45c", "#f2ff3f", "#111111"],
+  "man-city": ["#72c8ef", "#ffffff", "#1d3152"],
+  arsenal: ["#e52b3b", "#ffffff", "#15356e"],
+  liverpool: ["#c8102e", "#ffffff", "#00b2a9"],
+  "real-madrid": ["#f8f7f1", "#b69cf6", "#1d2447"],
+  barcelona: ["#233a8b", "#a51e4d", "#f0bd25"],
+  atletico: ["#d7193f", "#ffffff", "#1c3f77"],
+  bayern: ["#dc1638", "#ffffff", "#163d8d"],
+  dortmund: ["#f6dc20", "#111111", "#ffffff"],
+  inter: ["#1464d2", "#101010", "#ffffff"],
+  milan: ["#d71939", "#111111", "#ffffff"],
+  juventus: ["#f8f8f3", "#111111", "#e7c95b"],
+  psg: ["#17294e", "#e73445", "#ffffff"],
+  "al-nassr": ["#f3df22", "#1c55a1", "#ffffff"],
+  "inter-miami": ["#f6a5bd", "#161616", "#ffffff"],
+  boca: ["#183c83", "#f2ca2e", "#ffffff"],
+  "river-plate": ["#f8f7f1", "#d9263e", "#111111"],
+  flamengo: ["#d71939", "#111111", "#ffffff"],
+  palmeiras: ["#147548", "#ffffff", "#d2a94e"],
+};
+
+const kitFallbacks: [string, string, string][] = [
+  ["#5537d8", "#dfff36", "#ffffff"],
+  ["#006bff", "#ffffff", "#ff4f69"],
+  ["#12a879", "#e7ff4d", "#0a2440"],
+  ["#ff5c35", "#ffffff", "#171717"],
+  ["#1c2d5a", "#f6d33a", "#ffffff"],
+  ["#a92462", "#72e4d1", "#ffffff"],
+];
+
+function getKitColors(club: ClubProfile) {
+  if (kitColorOverrides[club.id]) return kitColorOverrides[club.id];
+  const score = [...club.id].reduce(
+    (total, character) => total + character.charCodeAt(0),
+    0,
+  );
+  return kitFallbacks[score % kitFallbacks.length];
+}
+
+function TeamKit({
+  club,
+  variant = "mini",
+}: {
+  club: ClubProfile;
+  variant?: "mini" | "card" | "hero";
+}) {
+  const [primary, secondary, accent] = getKitColors(club);
+  const style = {
+    "--kit-primary": primary,
+    "--kit-secondary": secondary,
+    "--kit-accent": accent,
+  } as CSSProperties;
+
+  return (
+    <span
+      className={`team-kit team-kit-${variant}`}
+      style={style}
+      aria-label={`${club.localName}球衣`}
+    >
+      <i className="kit-shirt">
+        <b>{club.localName.slice(0, 1)}</b>
+      </i>
+    </span>
+  );
+}
 
 function TeamCrest({ club, size = 48 }: { club: ClubProfile; size?: number }) {
   const [source, setSource] = useState(() => crestCache.get(club.id) ?? "");
