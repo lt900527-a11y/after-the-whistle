@@ -525,7 +525,7 @@ const wildEvents: Omit<Chapter, "year" | "age">[] = [
         copy: "不发声明，只要求他当面说完。",
         impact: "信任 ↑↑ · 名气 ↓",
         effects: { trust: 16, reputation: -3, morale: 8, ovr: 2 },
-        note: "你们差点动手，最后却一起加练到深夜。第二天，队长公开为你送上助攻。",
+        note: "你们差点动手，最后却一起加练到深夜。第二天，队长公开为你送上支持。",
       },
       {
         eyebrow: "制造反转",
@@ -613,7 +613,7 @@ const wildEvents: Omit<Chapter, "year" | "age">[] = [
         copy: "把荒唐承诺变成全城赌局。",
         impact: "进球欲望 ↑↑↑ · 压力 ↑",
         effects: { reputation: 18, morale: 8, goals: 3, energy: -7, value: 70 },
-        note: "你在第88分钟头球绝杀。老板真的交出钥匙，但那座“岛”退潮时可以走过去。",
+        note: "你在第88分钟制造绝杀。老板真的交出钥匙，但那座“岛”退潮时可以走过去。",
       },
       {
         eyebrow: "团队优先",
@@ -621,7 +621,7 @@ const wildEvents: Omit<Chapter, "year" | "age">[] = [
         copy: "把个人奖励变成俱乐部未来。",
         impact: "信任 ↑↑↑ · 情商 ↑",
         effects: { trust: 18, reputation: 10, assists: 3, morale: 10 },
-        note: "你没有进球，却送出两次助攻。青训基地后来以你的名字命名。",
+        note: "你放弃个人风头，把机会留给队友。青训基地后来以你的名字命名。",
       },
       {
         eyebrow: "拒绝噱头",
@@ -645,7 +645,7 @@ const wildEvents: Omit<Chapter, "year" | "age">[] = [
         copy: "短期失去数据，换长期上限。",
         impact: "能力 ↑↑↑ · 体能 ↓↓",
         effects: { ovr: 5, energy: -14, goals: -2, assists: 4, trust: 9 },
-        note: "前五场你像个迷路的人，第六场却用新位置完成了职业生涯第一次帽子戏法。",
+        note: "前五场你像个迷路的人，第六场却用新位置踢出了职业生涯代表作。",
       },
       {
         eyebrow: "位置战争",
