@@ -1004,6 +1004,8 @@ a:focus-visible {
 }
 
 .choice-card {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   min-height: 176px;
   padding: 15px;
@@ -1016,8 +1018,13 @@ a:focus-visible {
   gap: 10px;
   background: var(--surface-2);
   cursor: pointer;
+  touch-action: manipulation;
   text-align: left;
   transition: 0.2s ease;
+}
+
+.choice-card > * {
+  pointer-events: none;
 }
 
 .choice-card:hover {
@@ -3035,6 +3042,8 @@ a:focus-visible {
 }
 
 .big-stats > div {
+  position: relative;
+  isolation: isolate;
   min-height: 128px;
   justify-content: flex-end;
   overflow: hidden;
@@ -3048,6 +3057,7 @@ a:focus-visible {
   content: "";
   position: absolute;
   inset: 0;
+  pointer-events: none;
   opacity: 0.14;
   background: linear-gradient(135deg, transparent 45%, currentColor 45% 49%, transparent 49%);
 }
