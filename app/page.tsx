@@ -716,6 +716,36 @@ function randomBetween(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+const positionProduction: Record<
+  Position,
+  { goalsPerAppearance: number; assistsPerAppearance: number }
+> = {
+  ST: { goalsPerAppearance: 0.38, assistsPerAppearance: 0.13 },
+  LW: { goalsPerAppearance: 0.27, assistsPerAppearance: 0.2 },
+  RW: { goalsPerAppearance: 0.27, assistsPerAppearance: 0.2 },
+  CAM: { goalsPerAppearance: 0.16, assistsPerAppearance: 0.25 },
+  LM: { goalsPerAppearance: 0.11, assistsPerAppearance: 0.2 },
+  RM: { goalsPerAppearance: 0.11, assistsPerAppearance: 0.2 },
+  CM: { goalsPerAppearance: 0.07, assistsPerAppearance: 0.17 },
+  CDM: { goalsPerAppearance: 0.035, assistsPerAppearance: 0.09 },
+  LB: { goalsPerAppearance: 0.025, assistsPerAppearance: 0.11 },
+  RB: { goalsPerAppearance: 0.025, assistsPerAppearance: 0.11 },
+  CB: { goalsPerAppearance: 0.03, assistsPerAppearance: 0.025 },
+  GK: { goalsPerAppearance: 0.002, assistsPerAppearance: 0.008 },
+};
+
+function samplePoisson(mean: number) {
+  if (mean <= 0) return 0;
+  const limit = Math.exp(-mean);
+  let product = 1;
+  let count = 0;
+  do {
+    count += 1;
+    product *= Math.random();
+  } while (product > limit && count < 80);
+  return Math.max(0, count - 1);
+}
+
 const noInjury: InjuryOutcome = {
   severity: "none",
   label: "身体无碍",
@@ -1167,58 +1197,103 @@ export default function Home() {
 
   const choose = (choice: Choice) => {
     if (!current || resolution) return;
-    const attackingGoalRange: Record<Position, [number, number]> = {
-      ST: [9, 25],
-      LW: [6, 18],
-      RW: [6, 18],
-      CAM: [4, 13],
-      LM: [3, 10],
-      RM: [3, 10],
-      CM: [2, 8],
-      CDM: [0, 5],
-      LB: [0, 4],
-      RB: [0, 4],
-      CB: [0, 4],
-      GK: [0, 1],
-    };
-    const assistRange: Record<Position, [number, number]> = {
-      ST: [2, 9],
-      LW: [5, 15],
-      RW: [5, 15],
-      CAM: [7, 18],
-      LM: [5, 14],
-      RM: [5, 14],
-      CM: [5, 14],
-      CDM: [2, 9],
-      LB: [3, 11],
-      RB: [3, 11],
-      CB: [0, 4],
-      GK: [0, 2],
-    };
-    const scheduledApps =
+    const appearanceRange: [number, number] =
       current.age < 16
-        ? Math.max(choice.effects.apps ?? 0, randomBetween(3, 10))
-        : Math.max(choice.effects.apps ?? 0, randomBetween(18, 40));
-    const [goalMin, goalMax] = attackingGoalRange[game.position];
-    const [assistMin, assistMax] = assistRange[game.position];
-    const scheduledGoals = Math.max(
-      choice.effects.goals ?? 0,
-      randomBetween(goalMin, goalMax) +
-        Math.floor((game.attributes.luck - 50) / 18),
+        ? [1, 8]
+        : current.age < 18
+          ? [6, 22]
+          : current.age <= 32
+            ? [20, 40]
+            : current.age <= 35
+              ? [15, 34]
+              : [7, 28];
+    const clubSelectionLevel = currentClub
+      ? 58 +
+        currentClub.league.weight * 22 +
+        (currentClub.team.level === "世界豪门"
+          ? 4
+          : currentClub.team.level === "洲际强队"
+            ? 2
+            : 0)
+      : 68;
+    const selectionModifier = Math.max(
+      -8,
+      Math.min(6, Math.round((game.ovr - clubSelectionLevel) / 3.5)),
     );
-    const scheduledAssists = Math.max(
-      choice.effects.assists ?? 0,
-      randomBetween(assistMin, assistMax) +
-        Math.floor((game.attributes.iq - 50) / 20),
+    const appearanceSignal = Math.max(
+      -4,
+      Math.min(4, Math.round(((choice.effects.apps ?? 24) - 24) / 6)),
+    );
+    const scheduledApps = Math.max(
+      0,
+      Math.min(
+        44,
+        randomBetween(...appearanceRange) +
+          selectionModifier +
+          appearanceSignal,
+      ),
     );
     const injury = rollSeasonInjury(game, choice, current.age);
-    const availability = Math.max(
-      0,
-      (scheduledApps - injury.appsLost) / Math.max(1, scheduledApps),
-    );
     const apps = Math.max(0, scheduledApps - injury.appsLost);
-    const goals = Math.max(0, Math.round(scheduledGoals * availability));
-    const assists = Math.max(0, Math.round(scheduledAssists * availability));
+    const production = positionProduction[game.position];
+    const abilityFactor = Math.max(
+      0.48,
+      Math.min(1.18, 0.5 + (game.ovr - 45) * 0.012),
+    );
+    const ageFactor =
+      current.age < 16
+        ? 0.42
+        : current.age < 18
+          ? 0.68
+          : current.age <= 31
+            ? 1
+            : Math.max(0.62, 1 - (current.age - 31) * 0.055);
+    const leagueFactor = currentClub
+      ? Math.max(0.82, 1.04 - currentClub.league.weight * 0.14)
+      : 0.92;
+    const choiceGoalSignal = Math.max(
+      0.82,
+      Math.min(1.16, 1 + (choice.effects.goals ?? 0) * 0.012),
+    );
+    const choiceAssistSignal = Math.max(
+      0.84,
+      Math.min(1.16, 1 + (choice.effects.assists ?? 0) * 0.012),
+    );
+    const seasonForm = randomBetween(78, 116) / 100;
+    const breakoutFactor = Math.random() < 0.045 ? 1.32 : 1;
+    const goals = Math.min(
+      apps,
+      samplePoisson(
+        apps *
+          production.goalsPerAppearance *
+          abilityFactor *
+          ageFactor *
+          leagueFactor *
+          choiceGoalSignal *
+          seasonForm *
+          breakoutFactor,
+      ),
+    );
+    const assists = Math.min(
+      apps,
+      samplePoisson(
+        apps *
+          production.assistsPerAppearance *
+          abilityFactor *
+          ageFactor *
+          choiceAssistSignal *
+          (0.92 + (game.attributes.iq - 50) / 250) *
+          seasonForm,
+      ),
+    );
+    const goalMax = Math.max(
+      1,
+      apps * production.goalsPerAppearance * 1.35,
+    );
+    const assistMax = Math.max(
+      1,
+      apps * production.assistsPerAppearance * 1.35,
+    );
     const formDelta = calculateSeasonGrowth({
       age: current.age,
       game,
@@ -1425,8 +1500,10 @@ export default function Home() {
         ? game.rating >= 8.5 &&
           hashCareer(`${game.careerSeed}-${age}-${offer.id}`) % 100 < 8
           ? 1
-          : 0
-        : quotedOvrDelta;
+          : randomBetween(-2, 0)
+        : quotedOvrDelta > 0
+          ? randomBetween(-2, quotedOvrDelta)
+          : quotedOvrDelta;
     const effectiveEffects = { ...offer.effects, ovr: ovrDelta };
     setPendingOffers([]);
     setGame((prev) => {
@@ -2264,6 +2341,7 @@ export default function Home() {
                 if (!found) return null;
                 const ovrChange = offer.effects.ovr ?? 0;
                 const lateCareerGrowth = age >= 28 && ovrChange > 0;
+                const volatileGrowth = ovrChange > 0;
                 return (
                   <button
                     key={offer.id}
@@ -2297,10 +2375,20 @@ export default function Home() {
                       </span>
                     </div>
                     <div className="offer-impact">
-                      <strong className={ovrChange >= 0 ? "positive" : "negative"}>
+                      <strong
+                        className={
+                          volatileGrowth
+                            ? "volatile"
+                            : ovrChange < 0
+                              ? "negative"
+                              : "positive"
+                        }
+                      >
                         {lateCareerGrowth
-                          ? "OVR 小概率 +1"
-                          : `OVR ${ovrChange >= 0 ? "+" : ""}${ovrChange}`}
+                          ? "OVR -2～+1 · 增长概率低"
+                          : volatileGrowth
+                            ? `OVR -2～+${ovrChange}`
+                            : `OVR ${ovrChange >= 0 ? "+" : ""}${ovrChange}`}
                       </strong>
                       <span>{offer.risk}</span>
                     </div>
