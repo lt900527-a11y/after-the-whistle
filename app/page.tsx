@@ -8,17 +8,36 @@ import {
   type CameoChoice,
 } from "./real-world-events";
 import {
-  confederations,
+  allClubs,
   evaluateSeasonAwards,
   findClub,
   nationalTeams,
-  worldLeagues,
   type ClubProfile,
   type Confederation,
 } from "./world-football";
 
 type Phase = "setup" | "career" | "ending";
-type Position = "ST" | "LW" | "CAM" | "CM" | "CB";
+type Position =
+  | "LW"
+  | "ST"
+  | "RW"
+  | "LM"
+  | "CAM"
+  | "RM"
+  | "LB"
+  | "CM"
+  | "RB"
+  | "CDM"
+  | "CB"
+  | "GK";
+type AttributeKey =
+  | "technique"
+  | "pace"
+  | "iq"
+  | "height"
+  | "eq"
+  | "luck";
+type AttributeMap = Record<AttributeKey, number>;
 type StatKey =
   | "ovr"
   | "energy"
@@ -70,10 +89,45 @@ type GameState = {
   goals: number;
   assists: number;
   reputation: number;
+  rating: number;
+  peakOvr: number;
+  careerSeed: number;
+  build: AttributeMap;
+  attributes: AttributeMap;
   trophies: string[];
   seasonAwards: { age: number; year: number; items: string[] }[];
   pendingCameoId?: string | null;
   history: { age: number; title: string; note: string }[];
+};
+
+type ContractOffer = {
+  id: string;
+  clubId: string;
+  kind: "stay" | "starter" | "money" | "contender" | "project";
+  label: string;
+  headline: string;
+  role: string;
+  salary: string;
+  risk: string;
+  copy: string;
+  effects: Partial<Record<StatKey, number>>;
+};
+
+type Resolution = {
+  kind: "season" | "contract";
+  title: string;
+  note: string;
+  beforeOvr: number;
+  afterOvr: number;
+  rating: number;
+  statDeltas: Pick<
+    Record<StatKey, number>,
+    "apps" | "goals" | "assists" | "value" | "reputation"
+  >;
+  attributeDeltas: Partial<AttributeMap>;
+  offerAfter: boolean;
+  advanceAfter: boolean;
+  goalBurst: boolean;
 };
 
 const origins = [
@@ -103,13 +157,52 @@ const origins = [
   },
 ];
 
-const positions: { id: Position; name: string; hint: string; number: string }[] = [
-  { id: "ST", name: "中锋", hint: "终结", number: "9" },
-  { id: "LW", name: "边锋", hint: "突破", number: "11" },
-  { id: "CAM", name: "前腰", hint: "创造", number: "10" },
-  { id: "CM", name: "中场", hint: "掌控", number: "8" },
-  { id: "CB", name: "中卫", hint: "防守", number: "4" },
+const positions: { id: Position; name: string; zone: string; number: string }[] = [
+  { id: "LW", name: "左边锋", zone: "锋线", number: "11" },
+  { id: "ST", name: "中锋", zone: "锋线", number: "9" },
+  { id: "RW", name: "右边锋", zone: "锋线", number: "7" },
+  { id: "LM", name: "左前卫", zone: "中场", number: "17" },
+  { id: "CAM", name: "前腰", zone: "中场", number: "10" },
+  { id: "RM", name: "右前卫", zone: "中场", number: "19" },
+  { id: "LB", name: "左边卫", zone: "后场", number: "3" },
+  { id: "CM", name: "中前卫", zone: "中场", number: "8" },
+  { id: "RB", name: "右边卫", zone: "后场", number: "2" },
+  { id: "CDM", name: "后腰", zone: "中场", number: "6" },
+  { id: "CB", name: "中后卫", zone: "后场", number: "4" },
+  { id: "GK", name: "门将", zone: "门前", number: "1" },
 ];
+
+const attributes: {
+  id: AttributeKey;
+  label: string;
+  short: string;
+  icon: string;
+}[] = [
+  { id: "technique", label: "技术", short: "TEC", icon: "◎" },
+  { id: "pace", label: "速度", short: "PAC", icon: "»" },
+  { id: "iq", label: "球商", short: "IQ", icon: "◇" },
+  { id: "height", label: "身体", short: "PHY", icon: "▲" },
+  { id: "eq", label: "情商", short: "EQ", icon: "◉" },
+  { id: "luck", label: "幸运", short: "LUK", icon: "✦" },
+];
+
+const emptyBuild: AttributeMap = {
+  technique: 0,
+  pace: 0,
+  iq: 0,
+  height: 0,
+  eq: 0,
+  luck: 0,
+};
+
+const baseAttributes: AttributeMap = {
+  technique: 44,
+  pace: 44,
+  iq: 44,
+  height: 44,
+  eq: 44,
+  luck: 44,
+};
 
 const legacyChapters: Chapter[] = [
   {
@@ -375,18 +468,313 @@ const legacyChapters: Chapter[] = [
 
 const chapters: Chapter[] = annualChapters;
 
+const positionAttributeBonus: Record<Position, Partial<AttributeMap>> = {
+  LW: { pace: 7, technique: 5 },
+  ST: { technique: 6, pace: 3, height: 3 },
+  RW: { pace: 7, technique: 5 },
+  LM: { pace: 4, iq: 3, eq: 2 },
+  CAM: { technique: 5, iq: 6 },
+  RM: { pace: 4, iq: 3, eq: 2 },
+  LB: { pace: 4, height: 4, iq: 2 },
+  CM: { technique: 3, iq: 5, eq: 3 },
+  RB: { pace: 4, height: 4, iq: 2 },
+  CDM: { iq: 6, height: 5 },
+  CB: { height: 7, iq: 4 },
+  GK: { height: 7, iq: 5, eq: 2 },
+};
+
+const wildEvents: Omit<Chapter, "year" | "age">[] = [
+  {
+    kicker: "更衣室爆炸 · 群聊截图冲上热搜",
+    title: "队长在群里骂你像短视频球员",
+    story:
+      "匿名账号放出更衣室群聊截图。队长说你只会在镜头前努力，经纪人建议立刻开直播回击；教练则要求全队装作什么都没发生。",
+    choices: [
+      {
+        eyebrow: "直播开战",
+        title: "把训练数据一页页甩出来",
+        copy: "让全网当陪审团，也让队长没有退路。",
+        impact: "名气 ↑↑ · 情商 ↓",
+        effects: { reputation: 15, trust: -12, morale: 6, ovr: 2 },
+        note: "直播同时在线突破百万。你赢了舆论，却输掉了三个月的更衣室沉默。",
+      },
+      {
+        eyebrow: "关门解决",
+        title: "把手机扔桌上，和队长单独谈",
+        copy: "不发声明，只要求他当面说完。",
+        impact: "信任 ↑↑ · 名气 ↓",
+        effects: { trust: 16, reputation: -3, morale: 8, ovr: 2 },
+        note: "你们差点动手，最后却一起加练到深夜。第二天，队长公开为你送上助攻。",
+      },
+      {
+        eyebrow: "制造反转",
+        title: "穿印着那句话的T恤入场",
+        copy: "把攻击变成自己的新外号。",
+        impact: "名气 ↑↑↑ · 风险 ↑",
+        effects: { reputation: 20, trust: -4, value: 45, ovr: 1 },
+        note: "球迷把T恤买到断货。队长看到看台上的巨幅标语，只能摇头笑了。",
+      },
+    ],
+  },
+  {
+    kicker: "凌晨两点 · 经纪人连打十三通电话",
+    title: "假官宣把你送进了死敌更衣室",
+    story:
+      "一个高仿俱乐部账号宣布你加盟死敌，甚至伪造了签字照。旧主球迷烧掉你的球衣，新球队却真的打来电话：既然全世界都信了，不如把它变成真的。",
+    choices: [
+      {
+        eyebrow: "顺水推舟",
+        title: "要求对方今晚就传真合同",
+        copy: "让假新闻成为职业生涯最疯狂的转会。",
+        impact: "身价 ↑↑ · 信任 ↓↓",
+        effects: { value: 90, reputation: 16, trust: -16, ovr: 2 },
+        note: "天亮前，假官宣变成真官宣。你的第一场客场比赛需要三层安保。",
+      },
+      {
+        eyebrow: "忠诚声明",
+        title: "穿旧主球衣拍一镜到底",
+        copy: "不解释技术细节，只告诉球迷你还在。",
+        impact: "信任 ↑↑↑ · 报价消失",
+        effects: { trust: 20, morale: 7, value: -20, ovr: 1 },
+        note: "死敌撤回正式报价。旧主球迷在下一场比赛整整唱了九十分钟你的名字。",
+      },
+      {
+        eyebrow: "黑色幽默",
+        title: "转发假照片：至少把我修高一点",
+        copy: "让一场公关灾难变成全网笑话。",
+        impact: "情商 ↑↑ · 名气 ↑",
+        effects: { reputation: 13, morale: 11, trust: 5, value: 25 },
+        note: "两家俱乐部一起发了笑哭表情。那张假图后来成了年度最佳足球梗。",
+      },
+    ],
+  },
+  {
+    kicker: "赛前热身 · 球鞋离奇失踪",
+    title: "你的定制战靴被挂上二手平台",
+    story:
+      "开赛前四十分钟，球鞋柜只剩一张写着“祝你好运”的纸条。有人已经在二手平台开价十万，替补门将承认他知道是谁干的，但要你答应一个条件。",
+    choices: [
+      {
+        eyebrow: "赤脚复仇",
+        title: "借青年队球鞋直接上场",
+        copy: "号码不合脚，也比错过比赛更体面。",
+        impact: "能力 ↑↑ · 受伤风险",
+        effects: { ovr: 3, energy: -10, reputation: 12, goals: 2 },
+        note: "你脚后跟磨出血，却打进制胜球。那双借来的鞋被永久放进俱乐部展柜。",
+      },
+      {
+        eyebrow: "交换秘密",
+        title: "答应替补门将的神秘条件",
+        copy: "先拿回球鞋，代价以后再说。",
+        impact: "幸运 ↑↑ · 后患未知",
+        effects: { reputation: 9, morale: 5, value: -10, ovr: 1 },
+        note: "球鞋回来了。一个月后，门将要求你在点球大战故意把第五罚留给他。",
+      },
+      {
+        eyebrow: "全队搜查",
+        title: "锁上更衣室，谁都不准走",
+        copy: "比赛可以晚开，规矩不能被偷走。",
+        impact: "信任 ↓ · 威望 ↑",
+        effects: { trust: -9, reputation: 10, morale: -5, ovr: 1 },
+        note: "球鞋在按摩床下被找到。没人承认是谁放的，但从此没人再碰你的柜子。",
+      },
+    ],
+  },
+  {
+    kicker: "商业活动 · 赞助商突然加码",
+    title: "进一个球，老板送你一座海岛",
+    story:
+      "赞助商老板在直播中承诺：德比进球就送你一座私人海岛。足协警告这可能破坏比赛形象，队友却已经开始讨论岛上该修几个球场。",
+    choices: [
+      {
+        eyebrow: "接受挑战",
+        title: "对镜头说：准备好地契",
+        copy: "把荒唐承诺变成全城赌局。",
+        impact: "进球欲望 ↑↑↑ · 压力 ↑",
+        effects: { reputation: 18, morale: 8, goals: 3, energy: -7, value: 70 },
+        note: "你在第88分钟头球绝杀。老板真的交出钥匙，但那座“岛”退潮时可以走过去。",
+      },
+      {
+        eyebrow: "团队优先",
+        title: "要求把海岛换成青训基地",
+        copy: "把个人奖励变成俱乐部未来。",
+        impact: "信任 ↑↑↑ · 情商 ↑",
+        effects: { trust: 18, reputation: 10, assists: 3, morale: 10 },
+        note: "你没有进球，却送出两次助攻。青训基地后来以你的名字命名。",
+      },
+      {
+        eyebrow: "拒绝噱头",
+        title: "公开要求赞助商停止炒作",
+        copy: "德比不需要私人海岛才能重要。",
+        impact: "专注 ↑↑ · 商业价值 ↓",
+        effects: { ovr: 3, trust: 7, value: -35, reputation: 4 },
+        note: "赞助商撤下广告。你踢出了赛季评分最高的一场比赛。",
+      },
+    ],
+  },
+  {
+    kicker: "训练基地 · 新帅第一堂课",
+    title: "教练要把你改造成完全陌生的位置",
+    story:
+      "新教练说你的老位置已经过时，要你在六周内完成改造。经纪人认为这是逼你离队，数据分析师却偷偷告诉你：模型预测你会因此多踢五年。",
+    choices: [
+      {
+        eyebrow: "彻底重塑",
+        title: "每天加练两小时新位置",
+        copy: "短期失去数据，换长期上限。",
+        impact: "能力 ↑↑↑ · 体能 ↓↓",
+        effects: { ovr: 5, energy: -14, goals: -2, assists: 4, trust: 9 },
+        note: "前五场你像个迷路的人，第六场却用新位置完成了职业生涯第一次帽子戏法。",
+      },
+      {
+        eyebrow: "位置战争",
+        title: "公开告诉教练：我不会改",
+        copy: "用过去的数据守住自己的地盘。",
+        impact: "名气 ↑ · 信任 ↓↓↓",
+        effects: { reputation: 12, trust: -18, morale: 5, ovr: 1 },
+        note: "球迷站在你这边，教练却连续三场把你按在替补席。第四场，他因成绩下课。",
+      },
+      {
+        eyebrow: "秘密双修",
+        title: "训练踢新位置，比赛回到老位置",
+        copy: "不争论，用两套能力逼教练重新计算。",
+        impact: "球商 ↑↑ · 体能 ↓",
+        effects: { ovr: 4, energy: -8, trust: 12, assists: 3 },
+        note: "你成了阵型切换的开关。转播镜头每场都在猜你下一分钟会出现在哪里。",
+      },
+    ],
+  },
+];
+
+function hashCareer(value: string) {
+  return [...value].reduce(
+    (total, character) => (total * 31 + character.charCodeAt(0)) % 1000003,
+    7,
+  );
+}
+
+function getCareerChapter(
+  base: Chapter | undefined,
+  seed: number,
+  chapterIndex: number,
+) {
+  if (!base || base.age <= 14) return base;
+  const roll = (seed + chapterIndex * 37) % 5;
+  if (roll > 1) return base;
+  const twist = wildEvents[(seed + chapterIndex * 11) % wildEvents.length];
+  return { ...twist, age: base.age, year: base.year } as Chapter;
+}
+
+function buildAttributes(position: Position, build: AttributeMap) {
+  const bonus = positionAttributeBonus[position];
+  return attributes.reduce(
+    (result, attribute) => {
+      result[attribute.id] = clamp(
+        baseAttributes[attribute.id] +
+          (bonus[attribute.id] ?? 0) +
+          build[attribute.id] * 3,
+      );
+      return result;
+    },
+    { ...baseAttributes },
+  );
+}
+
+function calculateOvr(values: AttributeMap) {
+  return Math.round(
+    values.technique * 0.25 +
+      values.pace * 0.17 +
+      values.iq * 0.22 +
+      values.height * 0.12 +
+      values.eq * 0.12 +
+      values.luck * 0.12,
+  );
+}
+
+function randomBetween(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function shuffled<T>(items: T[]) {
+  return [...items].sort(() => Math.random() - 0.5);
+}
+
+function createContractOffers(game: GameState, initial = false) {
+  const eligible = allClubs.filter(({ team, league }) => {
+    if (team.id === game.clubId) return false;
+    if (initial) return league.weight <= 0.88 || Math.random() > 0.72;
+    if (game.ovr < 66) return league.weight <= 0.72;
+    if (game.ovr < 76) return league.weight <= 0.88;
+    if (game.ovr < 84) return league.weight <= 0.98;
+    return true;
+  });
+  const picks = shuffled(eligible).slice(0, initial ? 3 : 3);
+  const strategies: Omit<ContractOffer, "id" | "clubId">[] = [
+    {
+      kind: "starter",
+      label: "保证主力",
+      headline: "把球队交给你",
+      role: "核心首发",
+      salary: "薪资 ×1.4",
+      risk: "舞台较小",
+      copy: "出场时间写进合同，球队水平普通，但你能连续踢满整个赛季。",
+      effects: { ovr: 2, trust: 14, morale: 8, reputation: 2, value: 35 },
+    },
+    {
+      kind: "money",
+      label: "超级合同",
+      headline: "钱很多，位置没有",
+      role: "轮换 / 替补",
+      salary: "薪资 ×3.2",
+      risk: "不保证首发",
+      copy: "签字费足以改变家庭生活，但教练只承诺给你公平竞争的机会。",
+      effects: { ovr: -1, trust: -5, morale: 9, reputation: 7, value: 95 },
+    },
+    {
+      kind: "contender",
+      label: "争冠豪赌",
+      headline: "冠军窗口只开一次",
+      role: "激烈竞争",
+      salary: "薪资 ×1.8",
+      risk: "能力要求极高",
+      copy: "训练质量和冠军机会都在顶层，代价是每次失误都可能让你失去位置。",
+      effects: { ovr: 4, energy: -10, trust: -7, reputation: 13, value: 70 },
+    },
+  ];
+  const offers = picks.map(({ team }, index) => ({
+    ...strategies[index % strategies.length],
+    id: `${team.id}-${Date.now()}-${index}`,
+    clubId: team.id,
+  }));
+  if (!initial && game.clubId) {
+    offers.unshift({
+      id: `stay-${game.clubId}-${Date.now()}`,
+      clubId: game.clubId,
+      kind: "stay",
+      label: "留队续约",
+      headline: "熟悉的城市，新的核心条款",
+      role: "稳定首发",
+      salary: "薪资 ×1.2",
+      risk: "上限可见",
+      copy: "俱乐部承诺围绕你建队，冠军概率不高，但所有人都知道该把球交给谁。",
+      effects: { ovr: 1, trust: 12, morale: 6, reputation: 4, value: 25 },
+    });
+  }
+  return offers;
+}
+
 const baseState: GameState = {
   phase: "setup",
   chapter: 0,
   name: "林拓",
   position: "CAM",
   origin: "青训",
-  club: "山东泰山（鲁能）",
-  clubId: "shandong",
-  leagueId: "chn-csl",
+  club: "等待报价",
+  clubId: "",
+  leagueId: "",
   nationality: "中国",
   nationalConfederation: "AFC",
-  ovr: 44,
+  ovr: 46,
   energy: 78,
   morale: 72,
   trust: 32,
@@ -395,6 +783,11 @@ const baseState: GameState = {
   goals: 0,
   assists: 0,
   reputation: 4,
+  rating: 6.5,
+  peakOvr: 46,
+  careerSeed: 2026,
+  build: { ...emptyBuild },
+  attributes: { ...baseAttributes },
   trophies: [],
   seasonAwards: [],
   pendingCameoId: null,
@@ -408,19 +801,29 @@ export default function Home() {
   const [game, setGame] = useState<GameState>(baseState);
   const [loaded, setLoaded] = useState(false);
   const [showReset, setShowReset] = useState(false);
-  const [showClubPicker, setShowClubPicker] = useState(false);
-  const [activeConfederation, setActiveConfederation] =
-    useState<Confederation>("AFC");
-  const [clubSearch, setClubSearch] = useState("");
+  const [resolution, setResolution] = useState<Resolution | null>(null);
+  const [pendingOffers, setPendingOffers] = useState<ContractOffer[]>([]);
+  const [offerContext, setOfferContext] = useState<"initial" | "season">(
+    "initial",
+  );
+  const [queuedCameoId, setQueuedCameoId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const saved = window.localStorage.getItem("after90-career-v4");
+      const saved = window.localStorage.getItem("after90-career-v5");
       if (saved) {
         try {
-          setGame(JSON.parse(saved));
+          const parsed = JSON.parse(saved) as Partial<GameState>;
+          setGame({
+            ...baseState,
+            ...parsed,
+            build: { ...baseState.build, ...parsed.build },
+            attributes: { ...baseState.attributes, ...parsed.attributes },
+            careerSeed:
+              parsed.careerSeed ?? Math.floor(Math.random() * 1000000),
+          });
         } catch {
-          window.localStorage.removeItem("after90-career-v4");
+          window.localStorage.removeItem("after90-career-v5");
         }
       }
       setLoaded(true);
@@ -430,11 +833,14 @@ export default function Home() {
 
   useEffect(() => {
     if (loaded) {
-      window.localStorage.setItem("after90-career-v4", JSON.stringify(game));
+      window.localStorage.setItem("after90-career-v5", JSON.stringify(game));
     }
   }, [game, loaded]);
 
-  const current = chapters[game.chapter];
+  const current = useMemo(
+    () => getCareerChapter(chapters[game.chapter], game.careerSeed, game.chapter),
+    [game.chapter, game.careerSeed],
+  );
   const age = game.phase === "ending" ? 43 : current?.age ?? 14;
   const progress =
     game.phase === "setup"
@@ -447,6 +853,10 @@ export default function Home() {
   const upcomingCameo = current
     ? findRealWorldEventByAge(current.age)
     : undefined;
+  const usedBuildPoints = Object.values(game.build).reduce(
+    (total, value) => total + value,
+    0,
+  );
 
   const ending = useMemo(() => {
     const score =
@@ -477,37 +887,168 @@ export default function Home() {
     };
   }, [game]);
 
+  const adjustBuild = (key: AttributeKey, amount: number) => {
+    setGame((prev) => {
+      const used = Object.values(prev.build).reduce(
+        (total, value) => total + value,
+        0,
+      );
+      const nextValue = prev.build[key] + amount;
+      if (nextValue < 0 || nextValue > 10 || (amount > 0 && used >= 10)) {
+        return prev;
+      }
+      return { ...prev, build: { ...prev.build, [key]: nextValue } };
+    });
+  };
+
+  const advanceCareer = () => {
+    setGame((prev) =>
+      prev.chapter === chapters.length - 1
+        ? { ...prev, phase: "ending", pendingCameoId: null }
+        : { ...prev, chapter: prev.chapter + 1, pendingCameoId: null },
+    );
+  };
+
   const startCareer = () => {
+    if (!game.name.trim() || usedBuildPoints !== 10) return;
     const origin = origins.find((item) => item.id === game.origin);
-    const boosts: Partial<Record<StatKey, number>> =
-      origin?.id === "街头"
-        ? { ovr: 3, reputation: 8 }
-        : origin?.id === "校园"
-          ? { energy: 8, morale: 6 }
-          : { ovr: 2, trust: 8 };
-    setGame((prev) => ({
-      ...prev,
-      ovr: prev.ovr + (boosts.ovr ?? 0),
-      energy: prev.energy + (boosts.energy ?? 0),
-      morale: prev.morale + (boosts.morale ?? 0),
-      trust: prev.trust + (boosts.trust ?? 0),
-      reputation: prev.reputation + (boosts.reputation ?? 0),
+    const nextAttributes = buildAttributes(game.position, game.build);
+    if (game.origin === "街头") {
+      nextAttributes.technique = clamp(nextAttributes.technique + 4);
+      nextAttributes.luck = clamp(nextAttributes.luck + 2);
+    } else if (game.origin === "校园") {
+      nextAttributes.pace = clamp(nextAttributes.pace + 3);
+      nextAttributes.height = clamp(nextAttributes.height + 3);
+    } else {
+      nextAttributes.iq = clamp(nextAttributes.iq + 4);
+      nextAttributes.eq = clamp(nextAttributes.eq + 2);
+    }
+    const startingOvr = calculateOvr(nextAttributes);
+    const nextState: GameState = {
+      ...game,
       phase: "career",
+      club: "等待报价",
+      clubId: "",
+      leagueId: "",
+      attributes: nextAttributes,
+      ovr: startingOvr,
+      peakOvr: startingOvr,
+      careerSeed:
+        Math.floor(Math.random() * 1000000) +
+        hashCareer(`${game.name}-${game.position}`),
       history: [
         {
           age: 13,
           title: `${origin?.title ?? "无名少年"}出身`,
-          note: "你决定认真试一试，看看足球能把自己带到多远。",
+          note: `你以${positions.find((item) => item.id === game.position)?.name ?? game.position}身份进入职业足球，十点天赋决定了第一条成长路线。`,
         },
       ],
-    }));
+    };
+    setGame(nextState);
+    setOfferContext("initial");
+    setPendingOffers(createContractOffers(nextState, true));
   };
 
   const choose = (choice: Choice) => {
-    const cameo = findRealWorldEventByAge(current.age);
+    if (!current || resolution) return;
+    const attackingGoalRange: Record<Position, [number, number]> = {
+      ST: [9, 25],
+      LW: [6, 18],
+      RW: [6, 18],
+      CAM: [4, 13],
+      LM: [3, 10],
+      RM: [3, 10],
+      CM: [2, 8],
+      CDM: [0, 5],
+      LB: [0, 4],
+      RB: [0, 4],
+      CB: [0, 4],
+      GK: [0, 1],
+    };
+    const assistRange: Record<Position, [number, number]> = {
+      ST: [2, 9],
+      LW: [5, 15],
+      RW: [5, 15],
+      CAM: [7, 18],
+      LM: [5, 14],
+      RM: [5, 14],
+      CM: [5, 14],
+      CDM: [2, 9],
+      LB: [3, 11],
+      RB: [3, 11],
+      CB: [0, 4],
+      GK: [0, 2],
+    };
+    const apps =
+      current.age < 16
+        ? Math.max(choice.effects.apps ?? 0, randomBetween(3, 10))
+        : Math.max(choice.effects.apps ?? 0, randomBetween(18, 40));
+    const [goalMin, goalMax] = attackingGoalRange[game.position];
+    const [assistMin, assistMax] = assistRange[game.position];
+    const goals = Math.max(
+      choice.effects.goals ?? 0,
+      randomBetween(goalMin, goalMax) +
+        Math.floor((game.attributes.luck - 50) / 18),
+    );
+    const assists = Math.max(
+      choice.effects.assists ?? 0,
+      randomBetween(assistMin, assistMax) +
+        Math.floor((game.attributes.iq - 50) / 20),
+    );
+    const ageCurve =
+      current.age <= 22 ? 1 : current.age >= 34 ? randomBetween(-3, 0) : 0;
+    const ovrDelta = Math.max(
+      -5,
+      Math.min(
+        game.ovr >= 93 ? 1 : 5,
+        (choice.effects.ovr ?? 1) + randomBetween(-1, 1) + ageCurve,
+      ),
+    );
+    const firstAttribute =
+      attributes[
+        (choice.title.length + game.chapter + game.careerSeed) %
+          attributes.length
+      ].id;
+    const secondAttribute =
+      attributes[
+        (choice.copy.length + game.chapter * 3 + game.careerSeed) %
+          attributes.length
+      ].id;
+    const attributeDeltas: Partial<AttributeMap> = {
+      [firstAttribute]: current.age >= 36 ? randomBetween(-2, 1) : randomBetween(1, 2),
+      [secondAttribute]: current.age >= 34 ? randomBetween(-1, 1) : 1,
+    };
+    const rating = Math.min(
+      10,
+      Math.max(
+        5,
+        Number(
+          (
+            6.1 +
+            goals * 0.08 +
+            assists * 0.07 +
+            ovrDelta * 0.16 +
+            randomBetween(-4, 8) / 10
+          ).toFixed(1),
+        ),
+      ),
+    );
+    const statEffects: Partial<Record<StatKey, number>> = {
+      ...choice.effects,
+      apps,
+      goals,
+      assists,
+      ovr: ovrDelta,
+    };
+    const beforeOvr = game.ovr;
+    const afterOvr = clamp(beforeOvr + ovrDelta);
+    const seasonYear = Number.parseInt(current.year.slice(0, 4), 10);
     setGame((prev) => {
-      const next = { ...prev } as GameState;
-      Object.entries(choice.effects).forEach(([key, amount]) => {
+      const next = {
+        ...prev,
+        attributes: { ...prev.attributes },
+      } as GameState;
+      Object.entries(statEffects).forEach(([key, amount]) => {
         const stat = key as StatKey;
         const currentValue = next[stat] as number;
         const raw = currentValue + (amount ?? 0);
@@ -516,7 +1057,14 @@ export default function Home() {
             ? clamp(raw)
             : Math.max(0, raw)) as never;
       });
-      const seasonYear = Number.parseInt(current.year.slice(0, 4), 10);
+      Object.entries(attributeDeltas).forEach(([key, amount]) => {
+        const attribute = key as AttributeKey;
+        next.attributes[attribute] = clamp(
+          next.attributes[attribute] + (amount ?? 0),
+        );
+      });
+      next.rating = rating;
+      next.peakOvr = Math.max(next.peakOvr, next.ovr);
       const awards = evaluateSeasonAwards({
         age: current.age,
         year: seasonYear,
@@ -526,9 +1074,9 @@ export default function Home() {
         clubId: next.clubId,
         nationality: next.nationality,
         nationalConfederation: next.nationalConfederation,
-        seasonApps: choice.effects.apps ?? 0,
-        seasonGoals: choice.effects.goals ?? 0,
-        seasonAssists: choice.effects.assists ?? 0,
+        seasonApps: apps,
+        seasonGoals: goals,
+        seasonAssists: assists,
       });
       const earned = [...(choice.trophy ? [choice.trophy] : []), ...awards];
       if (earned.length) next.trophies = [...next.trophies, ...earned];
@@ -542,83 +1090,165 @@ export default function Home() {
           age: current.age,
           title: choice.title,
           note: awards.length
-            ? `${choice.note} 赛季评选：${awards.join("、")}。`
+            ? `${choice.note} 赛季荣誉：${awards.join("、")}。`
             : choice.note,
         },
       ];
-      if (cameo) {
-        next.pendingCameoId = cameo.id;
-      } else if (prev.chapter === chapters.length - 1) {
-        next.phase = "ending";
-      } else {
-        next.chapter += 1;
-      }
       return next;
+    });
+    setQueuedCameoId(findRealWorldEventByAge(current.age)?.id ?? null);
+    setResolution({
+      kind: "season",
+      title: rating >= 8.5 ? "赛季封神" : rating >= 7.5 ? "强势成长" : "赛季结算",
+      note: choice.note,
+      beforeOvr,
+      afterOvr,
+      rating,
+      statDeltas: {
+        apps,
+        goals,
+        assists,
+        value: choice.effects.value ?? 0,
+        reputation: choice.effects.reputation ?? 0,
+      },
+      attributeDeltas,
+      offerAfter:
+        current.age >= 16 &&
+        current.age <= 38 &&
+        (current.age % 2 === 0 ||
+          (game.careerSeed + current.age * 17) % 100 < 22),
+      advanceAfter: true,
+      goalBurst: goals > 0,
     });
   };
 
-  const chooseCameo = (choice: CameoChoice) => {
-    if (!activeCameo) return;
+  const chooseContract = (offer: ContractOffer) => {
+    const found = findClub(offer.clubId);
+    if (!found || resolution) return;
+    const beforeOvr = game.ovr;
+    const ovrDelta = offer.effects.ovr ?? 0;
+    setPendingOffers([]);
     setGame((prev) => {
-      const next = { ...prev } as GameState;
-      Object.entries(choice.effects).forEach(([key, amount]) => {
+      const next = { ...prev };
+      Object.entries(offer.effects).forEach(([key, amount]) => {
         const stat = key as StatKey;
-        const currentValue = next[stat] as number;
-        const raw = currentValue + (amount ?? 0);
+        const raw = (next[stat] as number) + (amount ?? 0);
         next[stat] =
           (["energy", "morale", "trust", "ovr", "reputation"].includes(stat)
             ? clamp(raw)
             : Math.max(0, raw)) as never;
       });
+      next.club = found.team.localName;
+      next.clubId = found.team.id;
+      next.leagueId = found.league.id;
+      next.peakOvr = Math.max(next.peakOvr, next.ovr);
+      next.history = [
+        ...next.history,
+        {
+          age,
+          title:
+            offer.kind === "stay"
+              ? `与 ${found.team.localName} 续约`
+              : `加盟 ${found.team.localName}`,
+          note: `${offer.label}：${offer.role}，${offer.salary}。${found.league.country}${found.league.name}，${found.team.level}。`,
+        },
+      ];
+      return next;
+    });
+    setResolution({
+      kind: "contract",
+      title: offer.kind === "stay" ? "续约完成" : "HERE WE GO",
+      note: `${found.team.localName} · ${found.league.country} · ${found.league.name}`,
+      beforeOvr,
+      afterOvr: clamp(beforeOvr + ovrDelta),
+      rating: game.rating,
+      statDeltas: {
+        apps: 0,
+        goals: 0,
+        assists: 0,
+        value: offer.effects.value ?? 0,
+        reputation: offer.effects.reputation ?? 0,
+      },
+      attributeDeltas: {},
+      offerAfter: false,
+      advanceAfter: offerContext === "season",
+      goalBurst: false,
+    });
+  };
+
+  const continueResolution = () => {
+    if (!resolution) return;
+    const resolved = resolution;
+    setResolution(null);
+    if (resolved.offerAfter) {
+      setOfferContext("season");
+      setPendingOffers(createContractOffers(game));
+      return;
+    }
+    if (!resolved.advanceAfter) return;
+    if (queuedCameoId) {
+      setGame((prev) => ({ ...prev, pendingCameoId: queuedCameoId }));
+      setQueuedCameoId(null);
+      return;
+    }
+    advanceCareer();
+  };
+
+  const chooseCameo = (choice: CameoChoice) => {
+    if (!activeCameo || resolution) return;
+    const beforeOvr = game.ovr;
+    const ovrDelta = choice.effects.ovr ?? 0;
+    setGame((prev) => {
+      const next = { ...prev } as GameState;
+      Object.entries(choice.effects).forEach(([key, amount]) => {
+        const stat = key as StatKey;
+        const raw = (next[stat] as number) + (amount ?? 0);
+        next[stat] =
+          (["energy", "morale", "trust", "ovr", "reputation"].includes(stat)
+            ? clamp(raw)
+            : Math.max(0, raw)) as never;
+      });
+      next.pendingCameoId = null;
+      next.peakOvr = Math.max(next.peakOvr, next.ovr);
       next.history = [
         ...next.history,
         {
           age: activeCameo.age,
-          title: `与 ${activeCameo.star} 的互动：${choice.title}`,
+          title: `${activeCameo.star}：${choice.title}`,
           note: choice.note,
         },
       ];
-      next.pendingCameoId = null;
-      if (prev.chapter === chapters.length - 1) {
-        next.phase = "ending";
-      } else {
-        next.chapter += 1;
-      }
       return next;
+    });
+    setQueuedCameoId(null);
+    setResolution({
+      kind: "season",
+      title: "突发事件结算",
+      note: choice.note,
+      beforeOvr,
+      afterOvr: clamp(beforeOvr + ovrDelta),
+      rating: game.rating,
+      statDeltas: {
+        apps: choice.effects.apps ?? 0,
+        goals: choice.effects.goals ?? 0,
+        assists: choice.effects.assists ?? 0,
+        value: choice.effects.value ?? 0,
+        reputation: choice.effects.reputation ?? 0,
+      },
+      attributeDeltas: {},
+      offerAfter: false,
+      advanceAfter: true,
+      goalBurst: (choice.effects.goals ?? 0) > 0,
     });
   };
 
   const resetGame = () => {
-    window.localStorage.removeItem("after90-career-v4");
-    setGame(baseState);
+    window.localStorage.removeItem("after90-career-v5");
+    setGame({ ...baseState, build: { ...emptyBuild }, attributes: { ...baseAttributes } });
+    setPendingOffers([]);
+    setResolution(null);
+    setQueuedCameoId(null);
     setShowReset(false);
-  };
-
-  const selectClub = (clubId: string) => {
-    const found = findClub(clubId);
-    if (!found) return;
-    setGame((prev) => {
-      const transfer =
-        prev.phase === "career" && prev.clubId !== clubId
-          ? [
-              ...prev.history,
-              {
-                age,
-                title: `转会 ${found.team.localName}`,
-                note: `你选择前往${found.league.country}的${found.league.name}，球队定位为${found.team.level}。`,
-              },
-            ]
-          : prev.history;
-      return {
-        ...prev,
-        club: found.team.localName,
-        clubId,
-        leagueId: found.league.id,
-        history: transfer,
-      };
-    });
-    setShowClubPicker(false);
-    setClubSearch("");
   };
 
   if (!loaded) {
@@ -673,18 +1303,18 @@ export default function Home() {
               <strong>42</strong>
               <span>岁</span>
             </div>
-            <div className="kit-showcase" aria-label="当前球队球衣">
-              {currentClub && (
-                <>
-                  <TeamKit club={currentClub.team} variant="hero" />
-                  <div className="showcase-club">
-                    <TeamCrest club={currentClub.team} size={66} />
-                    <span>{currentClub.league.country}</span>
-                    <strong>{currentClub.team.localName}</strong>
-                    <small>{currentClub.league.name}</small>
-                  </div>
-                </>
-              )}
+            <div className="kit-showcase prospect-showcase" aria-label="新秀球衣">
+              <div className="prospect-shirt">
+                <span>
+                  {positions.find((item) => item.id === game.position)?.number}
+                </span>
+                <b>{game.name.slice(0, 6) || "PLAYER"}</b>
+              </div>
+              <div className="showcase-club">
+                <span>ROOKIE DRAFT</span>
+                <strong>{game.position} · 待签约新秀</strong>
+                <small>开局后随机收到三份俱乐部报价</small>
+              </div>
             </div>
           </section>
 
@@ -730,6 +1360,7 @@ export default function Home() {
                     <b>{position.number}</b>
                     <strong>{position.id}</strong>
                     <span>{position.name}</span>
+                    <em>{position.zone}</em>
                   </button>
                 ))}
               </div>
@@ -755,6 +1386,48 @@ export default function Home() {
                     <em>{origin.bonus.replace(" · ", "  ")}</em>
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div className="setup-block attribute-build-block">
+              <div className="block-title attribute-block-title">
+                <span className="row-icon">APT</span>
+                <strong>天赋加点</strong>
+                <b className={usedBuildPoints === 10 ? "complete" : ""}>
+                  剩余 {10 - usedBuildPoints}
+                </b>
+              </div>
+              <div className="attribute-builder">
+                {attributes.map((attribute) => {
+                  const preview = buildAttributes(game.position, game.build)[
+                    attribute.id
+                  ];
+                  return (
+                    <div className="attribute-stepper" key={attribute.id}>
+                      <span className="attribute-icon">{attribute.icon}</span>
+                      <span className="attribute-name">
+                        <strong>{attribute.label}</strong>
+                        <small>{attribute.short}</small>
+                      </span>
+                      <button
+                        onClick={() => adjustBuild(attribute.id, -1)}
+                        disabled={game.build[attribute.id] === 0}
+                        aria-label={`${attribute.label}减一点`}
+                      >
+                        −
+                      </button>
+                      <strong className="attribute-preview">{preview}</strong>
+                      <button
+                        onClick={() => adjustBuild(attribute.id, 1)}
+                        disabled={usedBuildPoints >= 10}
+                        aria-label={`${attribute.label}加一点`}
+                      >
+                        +
+                      </button>
+                      <em>+{game.build[attribute.id]}</em>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -785,26 +1458,27 @@ export default function Home() {
                 </select>
               </label>
 
-              <button
-                className="club-picker-button"
-                onClick={() => setShowClubPicker(true)}
-              >
-                {currentClub && <TeamKit club={currentClub.team} variant="mini" />}
+              <div className="club-picker-button random-offer-hint">
+                <span className="random-dice">⚄</span>
                 <span>
-                  <small>俱乐部</small>
-                  <strong>{currentClub?.team.localName ?? game.club}</strong>
+                  <small>第一站</small>
+                  <strong>随机俱乐部报价</strong>
                 </span>
                 <b aria-hidden="true">›</b>
-              </button>
+              </div>
             </div>
 
             <button
               className="primary-button"
               data-testid="start-career"
               onClick={startCareer}
-              disabled={!game.name.trim()}
+              disabled={!game.name.trim() || usedBuildPoints !== 10}
             >
-              <span>开球</span>
+              <span>
+                {usedBuildPoints === 10
+                  ? "抽取三份报价"
+                  : `还需分配 ${10 - usedBuildPoints} 点`}
+              </span>
               <span aria-hidden="true">▶</span>
             </button>
           </section>
@@ -838,30 +1512,27 @@ export default function Home() {
               </div>
             </div>
             <div className="mobile-quick-stats">
-              <div>
-                <span>能力</span>
+              <div className="mobile-ovr-stat">
+                <span>OVR</span>
                 <strong>{game.ovr}</strong>
               </div>
               <div>
-                <span>体能</span>
-                <strong>{game.energy}</strong>
+                <span>出场</span>
+                <strong>{game.apps}</strong>
               </div>
               <div>
-                <span>名气</span>
-                <strong>{game.reputation}</strong>
+                <span>进球</span>
+                <strong>{game.goals}</strong>
               </div>
               <div>
-                <span>身价</span>
-                <strong>
-                  {game.value >= 1000
-                    ? `${(game.value / 1000).toFixed(1)}亿`
-                    : `${game.value}万`}
-                </strong>
+                <span>助攻</span>
+                <strong>{game.assists}</strong>
               </div>
             </div>
-            <button onClick={() => setShowClubPicker(true)}>
-              转会中心 <span aria-hidden="true">↗</span>
-            </button>
+            <div className="mobile-rating">
+              <span>赛季评分</span>
+              <strong>{game.rating.toFixed(1)}</strong>
+            </div>
           </section>
 
           <div className="career-grid">
@@ -896,25 +1567,36 @@ export default function Home() {
                     <b>{currentClub.league.band}</b>
                     <b>{currentClub.team.level}</b>
                   </div>
-                  <button onClick={() => setShowClubPicker(true)}>
-                    打开转会中心 →
-                  </button>
+                  <small>转会机会由赛季表现随机触发</small>
                 </div>
               )}
 
               <div className="ovr-block">
-                <span>综合能力</span>
+                <span>OVERALL RATING</span>
                 <strong>{game.ovr}</strong>
+                <b className="peak-ovr">巅峰 {game.peakOvr}</b>
                 <div className="ovr-track">
                   <i style={{ width: `${game.ovr}%` }} />
                 </div>
               </div>
 
-              <div className="stat-list">
+              <div className="attribute-dashboard">
+                {attributes.map((attribute) => (
+                  <div key={attribute.id}>
+                    <span>{attribute.short}</span>
+                    <strong>{game.attributes[attribute.id]}</strong>
+                    <small>{attribute.label}</small>
+                  </div>
+                ))}
+              </div>
+
+              <div className="form-strip">
+                <div>
+                  <span>评分</span>
+                  <strong>{game.rating.toFixed(1)}</strong>
+                </div>
                 <Meter label="体能" value={game.energy} />
                 <Meter label="士气" value={game.morale} />
-                <Meter label="信任" value={game.trust} />
-                <Meter label="名气" value={game.reputation} />
               </div>
 
               <div className="market-card">
@@ -977,18 +1659,23 @@ export default function Home() {
                 <small>实时</small>
               </div>
               <div className="big-stats">
-                <div>
+                <div className="career-stat-primary">
                   <strong>{game.apps}</strong>
                   <span>出场</span>
                 </div>
-                <div>
+                <div className="career-stat-goals">
                   <strong>{game.goals}</strong>
                   <span>进球</span>
                 </div>
-                <div>
+                <div className="career-stat-assists">
                   <strong>{game.assists}</strong>
                   <span>助攻</span>
                 </div>
+              </div>
+              <div className="career-score-card">
+                <span>当前赛季评分</span>
+                <strong>{game.rating.toFixed(1)}</strong>
+                <i style={{ width: `${game.rating * 10}%` }} />
               </div>
               <div className="trophy-box">
                 <span>荣誉室</span>
@@ -1076,7 +1763,7 @@ export default function Home() {
               </div>
               <div className="final-ovr">
                 <span>PEAK OVR</span>
-                <strong>{game.ovr}</strong>
+                <strong>{game.peakOvr}</strong>
               </div>
             </div>
             <div className="record-stats">
@@ -1099,6 +1786,10 @@ export default function Home() {
               <div>
                 <span>最高身价</span>
                 <strong>{Math.max(game.value, 0)} 万</strong>
+              </div>
+              <div>
+                <span>生涯评分</span>
+                <strong>{game.rating.toFixed(1)}</strong>
               </div>
             </div>
             <div className="record-body">
@@ -1171,17 +1862,6 @@ export default function Home() {
             <p className="cameo-star">{activeCameo.star}</p>
             <h2 id="cameo-title">{activeCameo.headline}</h2>
             <p className="cameo-story">{activeCameo.story}</p>
-            <div className="reality-source">
-              <span>现实背景</span>
-              <p>{activeCameo.reality}</p>
-              <a
-                href={activeCameo.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                查看出处：{activeCameo.sourceLabel} ↗
-              </a>
-            </div>
             <div className="cameo-choice-list">
               {activeCameo.choices.map((choice, index) => (
                 <button
@@ -1200,99 +1880,182 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            <p className="fiction-note">
-              ※ 现实背景来自公开报道；本弹窗中的相遇、对话和后果均为虚构游戏剧情。
-            </p>
           </section>
         </div>
       )}
 
-      {showClubPicker && (
-        <div className="modal-backdrop" role="presentation">
+      {pendingOffers.length > 0 && (
+        <div className="modal-backdrop offer-backdrop" role="presentation">
           <section
-            className="modal club-picker-modal"
+            className="modal offer-modal"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="club-picker-title"
+            aria-labelledby="offer-title"
           >
-            <button
-              className="modal-close"
-              onClick={() => setShowClubPicker(false)}
-              aria-label="关闭全球选队"
-            >
-              ×
+            <header className="offer-modal-head">
+              <div>
+                <p className="overline">
+                  {offerContext === "initial"
+                    ? "ROOKIE CONTRACTS"
+                    : "TRANSFER WINDOW"}
+                </p>
+                <h2 id="offer-title">
+                  {offerContext === "initial"
+                    ? "三家俱乐部发来报价"
+                    : "市场为你的表现开价"}
+                </h2>
+              </div>
+              <div className="offer-player-score">
+                <span>OVR</span>
+                <strong>{game.ovr}</strong>
+              </div>
+            </header>
+            <div className="offer-grid">
+              {pendingOffers.map((offer) => {
+                const found = findClub(offer.clubId);
+                if (!found) return null;
+                const ovrChange = offer.effects.ovr ?? 0;
+                return (
+                  <button
+                    key={offer.id}
+                    className={`contract-offer offer-${offer.kind}`}
+                    onClick={() => chooseContract(offer)}
+                  >
+                    <span className="offer-type">{offer.label}</span>
+                    <div className="offer-club-visual">
+                      <TeamKit club={found.team} variant="card" />
+                      <TeamCrest club={found.team} size={58} />
+                    </div>
+                    <span className="offer-league">
+                      {found.league.country} · {found.league.name}
+                    </span>
+                    <strong className="offer-club-name">
+                      {found.team.localName}
+                    </strong>
+                    <span className="offer-level">
+                      {found.team.level} · {found.league.band}
+                    </span>
+                    <h3>{offer.headline}</h3>
+                    <p>{offer.copy}</p>
+                    <div className="offer-terms">
+                      <span>
+                        <small>定位</small>
+                        <b>{offer.role}</b>
+                      </span>
+                      <span>
+                        <small>合同</small>
+                        <b>{offer.salary}</b>
+                      </span>
+                    </div>
+                    <div className="offer-impact">
+                      <strong className={ovrChange >= 0 ? "positive" : "negative"}>
+                        OVR {ovrChange >= 0 ? "+" : ""}
+                        {ovrChange}
+                      </strong>
+                      <span>{offer.risk}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {resolution && (
+        <div
+          className={`modal-backdrop resolution-backdrop ${
+            resolution.goalBurst ? "has-goals" : ""
+          }`}
+          role="presentation"
+        >
+          <section
+            className="modal resolution-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="resolution-title"
+          >
+            {resolution.goalBurst && (
+              <div className="goal-celebration" aria-hidden="true">
+                <span>GOAL</span>
+                <i>✦</i>
+                <i>✦</i>
+                <i>✦</i>
+              </div>
+            )}
+            <p className="overline">
+              {resolution.kind === "contract"
+                ? "CONTRACT COMPLETE"
+                : "SEASON COMPLETE"}
+            </p>
+            <h2 id="resolution-title">{resolution.title}</h2>
+            <div className="resolution-ovr">
+              <div>
+                <span>此前</span>
+                <strong>{resolution.beforeOvr}</strong>
+              </div>
+              <b className={resolution.afterOvr >= resolution.beforeOvr ? "up" : "down"}>
+                {resolution.afterOvr >= resolution.beforeOvr ? "▲" : "▼"}
+                {Math.abs(resolution.afterOvr - resolution.beforeOvr)}
+              </b>
+              <div className="new-ovr">
+                <span>当前 OVR</span>
+                <strong>{resolution.afterOvr}</strong>
+              </div>
+            </div>
+            {resolution.kind === "season" && (
+              <>
+                <div className="resolution-rating">
+                  <span>赛季评分</span>
+                  <strong>{resolution.rating.toFixed(1)}</strong>
+                  <i style={{ width: `${resolution.rating * 10}%` }} />
+                </div>
+                <div className="resolution-stats">
+                  <div>
+                    <span>出场</span>
+                    <strong>+{resolution.statDeltas.apps}</strong>
+                  </div>
+                  <div className="goals">
+                    <span>进球</span>
+                    <strong>+{resolution.statDeltas.goals}</strong>
+                  </div>
+                  <div>
+                    <span>助攻</span>
+                    <strong>+{resolution.statDeltas.assists}</strong>
+                  </div>
+                </div>
+                <div className="attribute-gains">
+                  {Object.entries(resolution.attributeDeltas).map(
+                    ([key, value]) => {
+                      const attribute = attributes.find(
+                        (item) => item.id === key,
+                      );
+                      if (!attribute || !value) return null;
+                      return (
+                        <span
+                          className={value > 0 ? "positive" : "negative"}
+                          key={key}
+                        >
+                          {attribute.label} {value > 0 ? "+" : ""}
+                          {value}
+                        </span>
+                      );
+                    },
+                  )}
+                </div>
+              </>
+            )}
+            <p className="resolution-note">{resolution.note}</p>
+            <button className="primary-button" onClick={continueResolution}>
+              <span>
+                {resolution.offerAfter
+                  ? "查看俱乐部报价"
+                  : resolution.advanceAfter
+                    ? "继续生涯"
+                    : "进入首个赛季"}
+              </span>
+              <span aria-hidden="true">▶</span>
             </button>
-            <p className="overline">GLOBAL TRANSFER DESK</p>
-            <h2 id="club-picker-title">
-              {game.phase === "setup" ? "选择生涯第一站" : "选择下一支球队"}
-            </h2>
-            <div className="confederation-tabs">
-              {confederations.map((item) => (
-                <button
-                  key={item.id}
-                  className={activeConfederation === item.id ? "selected" : ""}
-                  onClick={() => setActiveConfederation(item.id)}
-                >
-                  <strong>{item.id}</strong>
-                  <span>{item.region}</span>
-                </button>
-              ))}
-            </div>
-            <input
-              className="club-search"
-              type="search"
-              value={clubSearch}
-              onChange={(event) => setClubSearch(event.target.value)}
-              placeholder="搜索球队、国家或联赛"
-              aria-label="搜索球队、国家或联赛"
-            />
-            <div className="league-browser">
-              {worldLeagues
-                .filter(
-                  (item) =>
-                    clubSearch.trim() ||
-                    item.confederation === activeConfederation,
-                )
-                .map((item) => {
-                  const keyword = clubSearch.trim().toLowerCase();
-                  const teams = item.clubs.filter(
-                    (team) =>
-                      !keyword ||
-                      `${team.name} ${team.localName} ${item.name} ${item.country}`
-                        .toLowerCase()
-                        .includes(keyword),
-                  );
-                  if (!teams.length) return null;
-                  return (
-                    <section className="league-group" key={item.id}>
-                      <header>
-                        <div>
-                          <strong>{item.country} · {item.name}</strong>
-                          <span>{item.band}</span>
-                        </div>
-                        <small>洲际赛：{item.continentalCup}</small>
-                      </header>
-                      <div className="club-grid">
-                        {teams.map((team) => (
-                          <button
-                            key={team.id}
-                            className={game.clubId === team.id ? "selected" : ""}
-                            onClick={() => selectClub(team.id)}
-                          >
-                            <TeamCrest club={team} size={42} />
-                            <TeamKit club={team} variant="mini" />
-                            <span>
-                              <strong>{team.localName}</strong>
-                              <small>{team.name}</small>
-                              <em>{team.level}</em>
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  );
-                })}
-            </div>
           </section>
         </div>
       )}
