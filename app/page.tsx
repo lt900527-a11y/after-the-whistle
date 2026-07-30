@@ -2,6 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { annualChapters } from "./annual-chapters";
+import {
+  allClubs,
+  confederations,
+  evaluateSeasonAwards,
+  findClub,
+  nationalTeams,
+  worldLeagues,
+  type ClubProfile,
+  type Confederation,
+} from "./world-football";
 
 type Phase = "setup" | "career" | "ending";
 type Position = "ST" | "LW" | "CAM" | "CM" | "CB";
@@ -43,6 +53,10 @@ type GameState = {
   position: Position;
   origin: string;
   club: string;
+  clubId: string;
+  leagueId: string;
+  nationality: string;
+  nationalConfederation: Confederation;
   ovr: number;
   energy: number;
   morale: number;
@@ -53,6 +67,7 @@ type GameState = {
   assists: number;
   reputation: number;
   trophies: string[];
+  seasonAwards: { age: number; year: number; items: string[] }[];
   history: { age: number; title: string; note: string }[];
 };
 
@@ -358,7 +373,11 @@ const baseState: GameState = {
   name: "林拓",
   position: "CAM",
   origin: "青训",
-  club: "自由球员",
+  club: "山东泰山（鲁能）",
+  clubId: "shandong",
+  leagueId: "chn-csl",
+  nationality: "中国",
+  nationalConfederation: "AFC",
   ovr: 44,
   energy: 78,
   morale: 72,
@@ -369,6 +388,7 @@ const baseState: GameState = {
   assists: 0,
   reputation: 4,
   trophies: [],
+  seasonAwards: [],
   history: [],
 };
 
@@ -380,22 +400,29 @@ export default function Home() {
   const [loaded, setLoaded] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [showReset, setShowReset] = useState(false);
+  const [showClubPicker, setShowClubPicker] = useState(false);
+  const [activeConfederation, setActiveConfederation] =
+    useState<Confederation>("AFC");
+  const [clubSearch, setClubSearch] = useState("");
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("after90-career-v3");
-    if (saved) {
-      try {
-        setGame(JSON.parse(saved));
-      } catch {
-        window.localStorage.removeItem("after90-career-v3");
+    const timer = window.setTimeout(() => {
+      const saved = window.localStorage.getItem("after90-career-v4");
+      if (saved) {
+        try {
+          setGame(JSON.parse(saved));
+        } catch {
+          window.localStorage.removeItem("after90-career-v4");
+        }
       }
-    }
-    setLoaded(true);
+      setLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (loaded) {
-      window.localStorage.setItem("after90-career-v3", JSON.stringify(game));
+      window.localStorage.setItem("after90-career-v4", JSON.stringify(game));
     }
   }, [game, loaded]);
 
@@ -407,6 +434,7 @@ export default function Home() {
       : game.phase === "ending"
         ? 100
         : Math.round((game.chapter / chapters.length) * 100);
+  const currentClub = useMemo(() => findClub(game.clubId), [game.clubId]);
 
   const ending = useMemo(() => {
     const score =
@@ -475,11 +503,35 @@ export default function Home() {
             ? clamp(raw)
             : Math.max(0, raw)) as never;
       });
-      if (choice.club) next.club = choice.club;
-      if (choice.trophy) next.trophies = [...next.trophies, choice.trophy];
+      const seasonYear = Number.parseInt(current.year.slice(0, 4), 10);
+      const awards = evaluateSeasonAwards({
+        age: current.age,
+        year: seasonYear,
+        ovr: next.ovr,
+        reputation: next.reputation,
+        morale: next.morale,
+        clubId: next.clubId,
+        nationality: next.nationality,
+        nationalConfederation: next.nationalConfederation,
+        seasonApps: choice.effects.apps ?? 0,
+        seasonGoals: choice.effects.goals ?? 0,
+        seasonAssists: choice.effects.assists ?? 0,
+      });
+      const earned = [...(choice.trophy ? [choice.trophy] : []), ...awards];
+      if (earned.length) next.trophies = [...next.trophies, ...earned];
+      next.seasonAwards = [
+        ...next.seasonAwards,
+        { age: current.age, year: seasonYear, items: awards },
+      ];
       next.history = [
         ...next.history,
-        { age: current.age, title: choice.title, note: choice.note },
+        {
+          age: current.age,
+          title: choice.title,
+          note: awards.length
+            ? `${choice.note} 赛季评选：${awards.join("、")}。`
+            : choice.note,
+        },
       ];
       if (prev.chapter === chapters.length - 1) {
         next.phase = "ending";
@@ -491,9 +543,36 @@ export default function Home() {
   };
 
   const resetGame = () => {
-    window.localStorage.removeItem("after90-career-v3");
+    window.localStorage.removeItem("after90-career-v4");
     setGame(baseState);
     setShowReset(false);
+  };
+
+  const selectClub = (clubId: string) => {
+    const found = findClub(clubId);
+    if (!found) return;
+    setGame((prev) => {
+      const transfer =
+        prev.phase === "career" && prev.clubId !== clubId
+          ? [
+              ...prev.history,
+              {
+                age,
+                title: `转会 ${found.team.localName}`,
+                note: `你选择前往${found.league.country}的${found.league.name}，球队定位为${found.team.level}。`,
+              },
+            ]
+          : prev.history;
+      return {
+        ...prev,
+        club: found.team.localName,
+        clubId,
+        leagueId: found.league.id,
+        history: transfer,
+      };
+    });
+    setShowClubPicker(false);
+    setClubSearch("");
   };
 
   if (!loaded) {
@@ -606,6 +685,62 @@ export default function Home() {
               ))}
             </div>
 
+            <label className="field-label" htmlFor="national-team">
+              国家队资格
+            </label>
+            <select
+              id="national-team"
+              className="national-team-select"
+              value={game.nationality}
+              onChange={(event) => {
+                const nation = nationalTeams.find(
+                  (item) => item.name === event.target.value,
+                );
+                if (!nation) return;
+                setGame((prev) => ({
+                  ...prev,
+                  nationality: nation.name,
+                  nationalConfederation: nation.confederation,
+                }));
+              }}
+            >
+              {nationalTeams.map((nation) => (
+                <option value={nation.name} key={nation.name}>
+                  {nation.flag} {nation.name} · {nation.confederation}
+                </option>
+              ))}
+            </select>
+
+            <div className="club-start-row">
+              <div>
+                <p className="field-label">生涯起点 · 真实俱乐部</p>
+                <div className="selected-club">
+                  {currentClub && (
+                    <TeamCrest club={currentClub.team} size={52} />
+                  )}
+                  <div>
+                    <strong>{currentClub?.team.localName ?? game.club}</strong>
+                    <span>
+                      {currentClub
+                        ? `${currentClub.league.country} · ${currentClub.league.name}`
+                        : "尚未选择联赛"}
+                    </span>
+                    <small>
+                      {currentClub
+                        ? `${currentClub.league.band} · ${currentClub.team.level}`
+                        : "请选择你的第一站"}
+                    </small>
+                  </div>
+                </div>
+              </div>
+              <button
+                className="club-picker-button"
+                onClick={() => setShowClubPicker(true)}
+              >
+                全球选队 <span>{allClubs.length} 队 →</span>
+              </button>
+            </div>
+
             <button
               className="primary-button"
               data-testid="start-career"
@@ -638,15 +773,34 @@ export default function Home() {
           <div className="career-grid">
             <aside className="player-panel">
               <div className="player-identity">
-                <div className="shirt-number">{game.position}</div>
+                {currentClub ? (
+                  <TeamCrest club={currentClub.team} size={58} />
+                ) : (
+                  <div className="shirt-number">{game.position}</div>
+                )}
                 <div>
-                  <span>{game.origin}出身</span>
+                  <span>{game.nationality}国家队 · {game.origin}出身</span>
                   <h2>{game.name}</h2>
                   <p>
                     {game.club} · {age} 岁
                   </p>
                 </div>
               </div>
+
+              {currentClub && (
+                <div className="club-status-card">
+                  <span>{currentClub.league.confederation}</span>
+                  <strong>{currentClub.league.country}</strong>
+                  <p>{currentClub.league.name}</p>
+                  <div>
+                    <b>{currentClub.league.band}</b>
+                    <b>{currentClub.team.level}</b>
+                  </div>
+                  <button onClick={() => setShowClubPicker(true)}>
+                    打开转会中心 →
+                  </button>
+                </div>
+              )}
 
               <div className="ovr-block">
                 <span>综合能力</span>
@@ -733,7 +887,7 @@ export default function Home() {
                 <span>荣誉室</span>
                 {game.trophies.length ? (
                   <ul>
-                    {game.trophies.map((trophy, index) => (
+                    {game.trophies.slice(-7).reverse().map((trophy, index) => (
                       <li key={`${trophy}-${index}`}>
                         <b>◆</b> {trophy}
                       </li>
@@ -741,6 +895,23 @@ export default function Home() {
                   </ul>
                 ) : (
                   <p>空着的位置，正在等你填满。</p>
+                )}
+                {game.trophies.length > 7 && (
+                  <small>另有 {game.trophies.length - 7} 项荣誉已归档</small>
+                )}
+              </div>
+              <div className="award-window">
+                <span>最近赛季评选</span>
+                {game.seasonAwards.at(-1)?.items.length ? (
+                  <>
+                    <strong>
+                      {game.seasonAwards.at(-1)?.year} ·{" "}
+                      {game.seasonAwards.at(-1)?.age} 岁
+                    </strong>
+                    <p>{game.seasonAwards.at(-1)?.items.join(" / ")}</p>
+                  </>
+                ) : (
+                  <p>完成本赛季后，联赛、洲际和世界奖项将在这里揭晓。</p>
                 )}
               </div>
               <div className="last-event">
@@ -793,7 +964,7 @@ export default function Home() {
                 <span>PLAYER No. {game.position}</span>
                 <h2>{game.name}</h2>
                 <p>
-                  {game.origin}出身 · 最后一站 {game.club}
+                  {game.nationality}国家队 · {game.origin}出身 · 最后一站 {game.club}
                 </p>
               </div>
               <div className="final-ovr">
@@ -872,8 +1043,103 @@ export default function Home() {
 
       <footer className="site-footer">
         <p>九十分钟后 · 原创足球文字生涯游戏</p>
-        <p>所有俱乐部、人物与数值均为虚构</p>
+        <p>真实俱乐部名称与队徽仅用于识别 · 联赛强度与球队定位为游戏判断</p>
       </footer>
+
+      {showClubPicker && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="modal club-picker-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="club-picker-title"
+          >
+            <button
+              className="modal-close"
+              onClick={() => setShowClubPicker(false)}
+              aria-label="关闭全球选队"
+            >
+              ×
+            </button>
+            <p className="overline">GLOBAL TRANSFER DESK</p>
+            <h2 id="club-picker-title">
+              {game.phase === "setup" ? "选择生涯第一站" : "选择下一支球队"}
+            </h2>
+            <p className="picker-intro">
+              六大洲足联、{worldLeagues.length} 个联赛、{allClubs.length} 支真实球队。联赛强度影响世界奖项难度，但不会封死任何地区的传奇路线。
+            </p>
+            <div className="confederation-tabs">
+              {confederations.map((item) => (
+                <button
+                  key={item.id}
+                  className={activeConfederation === item.id ? "selected" : ""}
+                  onClick={() => setActiveConfederation(item.id)}
+                >
+                  <strong>{item.id}</strong>
+                  <span>{item.region}</span>
+                </button>
+              ))}
+            </div>
+            <input
+              className="club-search"
+              type="search"
+              value={clubSearch}
+              onChange={(event) => setClubSearch(event.target.value)}
+              placeholder="搜索球队、国家或联赛"
+              aria-label="搜索球队、国家或联赛"
+            />
+            <div className="league-browser">
+              {worldLeagues
+                .filter(
+                  (item) =>
+                    clubSearch.trim() ||
+                    item.confederation === activeConfederation,
+                )
+                .map((item) => {
+                  const keyword = clubSearch.trim().toLowerCase();
+                  const teams = item.clubs.filter(
+                    (team) =>
+                      !keyword ||
+                      `${team.name} ${team.localName} ${item.name} ${item.country}`
+                        .toLowerCase()
+                        .includes(keyword),
+                  );
+                  if (!teams.length) return null;
+                  return (
+                    <section className="league-group" key={item.id}>
+                      <header>
+                        <div>
+                          <strong>{item.country} · {item.name}</strong>
+                          <span>{item.band}</span>
+                        </div>
+                        <small>洲际赛：{item.continentalCup}</small>
+                      </header>
+                      <div className="club-grid">
+                        {teams.map((team) => (
+                          <button
+                            key={team.id}
+                            className={game.clubId === team.id ? "selected" : ""}
+                            onClick={() => selectClub(team.id)}
+                          >
+                            <TeamCrest club={team} size={42} />
+                            <span>
+                              <strong>{team.localName}</strong>
+                              <small>{team.name}</small>
+                              <em>{team.level}</em>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+            </div>
+            <p className="crest-note">
+              队徽由公开百科条目动态加载，仅作球队身份识别；本站与各俱乐部无商业关联。
+            </p>
+          </section>
+        </div>
+      )}
 
       {showRules && (
         <div className="modal-backdrop" role="presentation">
@@ -910,8 +1176,15 @@ export default function Home() {
               <li>
                 <span>03</span>
                 <p>
-                  <strong>接受你的结局</strong>
-                  没有标准答案，只有属于你的生涯档案。
+                  <strong>自己掌控转会</strong>
+                  可从六大洲 {worldLeagues.length} 个联赛的 {allClubs.length} 支真实球队中自由选择。非五大联赛会显示国家、赛事层级和球队定位。
+                </p>
+              </li>
+              <li>
+                <span>04</span>
+                <p>
+                  <strong>竞争真实足球荣誉</strong>
+                  联赛冠军、洲际冠军、世界杯、金球奖、国际足联年度最佳等会按赛季表现评选；任何大洲都有机会。
                 </p>
               </li>
             </ol>
@@ -948,6 +1221,55 @@ export default function Home() {
         </div>
       )}
     </div>
+  );
+}
+
+const crestCache = new Map<string, string>();
+
+function TeamCrest({ club, size = 48 }: { club: ClubProfile; size?: number }) {
+  const [source, setSource] = useState(() => crestCache.get(club.id) ?? "");
+
+  useEffect(() => {
+    let active = true;
+    const cached = crestCache.get(club.id);
+    if (cached) {
+      Promise.resolve().then(() => {
+        if (active) setSource(cached);
+      });
+      return () => {
+        active = false;
+      };
+    }
+    Promise.resolve().then(() => {
+      if (active) setSource("");
+    });
+    fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${club.wiki}`)
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((data) => {
+        const image = data.thumbnail?.source ?? data.originalimage?.source;
+        if (active && image) {
+          crestCache.set(club.id, image);
+          setSource(image);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [club.id, club.wiki]);
+
+  return (
+    <span
+      className="team-crest"
+      style={{ width: size, height: size }}
+      aria-label={`${club.localName}队徽`}
+    >
+      {source ? (
+        <img src={source} alt={`${club.localName}队徽`} />
+      ) : (
+        <b>{club.localName.slice(0, 2)}</b>
+      )}
+    </span>
   );
 }
 
