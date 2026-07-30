@@ -4416,6 +4416,187 @@ a:focus-visible {
   }
 }
 
+/* Mobile hardening: compact rows and allow long Chinese/club copy to wrap. */
+@media (max-width: 720px) {
+  .setup-intro {
+    min-height: 250px;
+    padding: 20px 18px;
+  }
+
+  .setup-intro h1 {
+    margin: 18px 0 8px;
+    font-size: clamp(38px, 12vw, 52px);
+    line-height: 0.92;
+  }
+
+  .kit-showcase {
+    min-height: 116px;
+    margin-top: 2px;
+  }
+
+  .prospect-shirt {
+    width: 94px;
+    height: 112px;
+  }
+
+  .prospect-shirt span {
+    font-size: 38px;
+  }
+
+  .prospect-shirt b {
+    bottom: 12px;
+    max-width: 72px;
+    font-size: 8px;
+  }
+
+  .showcase-club {
+    padding: 9px 10px;
+  }
+
+  .showcase-club > strong {
+    overflow-wrap: anywhere;
+    font-size: 14px;
+  }
+
+  .showcase-club > small {
+    font-size: 8px;
+  }
+
+  .origin-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-right: 0;
+    padding-right: 0;
+    overflow: visible;
+  }
+
+  .origin-option {
+    min-width: 0;
+    min-height: 70px;
+    padding: 8px 5px;
+  }
+
+  .origin-option strong {
+    font-size: 9px;
+  }
+
+  .origin-option em {
+    font-size: 6px;
+    line-height: 1.35;
+    text-align: center;
+  }
+
+  .setup-split {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .quick-select,
+  .club-picker-button {
+    min-height: 58px;
+    padding: 7px 8px;
+  }
+
+  .club-picker-button {
+    gap: 6px;
+  }
+
+  .random-dice {
+    width: 32px;
+    height: 32px;
+    font-size: 17px;
+  }
+
+  .club-picker-button strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  .mobile-career-summary {
+    grid-template-columns: minmax(0, 1fr) 76px;
+  }
+
+  .mobile-player-id strong,
+  .mobile-player-id span,
+  .mobile-player-id small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-rating {
+    min-width: 0;
+    min-height: 54px;
+    padding: 7px 8px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mobile-rating strong {
+    font-size: 29px;
+  }
+
+  .mobile-quick-stats {
+    grid-column: 1 / -1;
+  }
+
+  .story-panel,
+  .choice-body,
+  .choice-body strong,
+  .choice-body > span,
+  .choice-card em,
+  .player-identity,
+  .player-identity > div:last-child,
+  .club-status-card,
+  .contract-offer {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .story-panel h1 {
+    overflow-wrap: anywhere;
+    font-size: clamp(27px, 8.4vw, 36px);
+  }
+
+  .story-copy {
+    font-size: 12px;
+    line-height: 1.58;
+  }
+
+  .choice-card em {
+    max-width: 100%;
+    white-space: normal;
+    line-height: 1.35;
+  }
+
+  .offer-league,
+  .offer-level,
+  .offer-club-name,
+  .offer-terms b {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .offer-club-name {
+    line-height: 1.08;
+  }
+
+  .offer-impact {
+    align-items: flex-start;
+  }
+
+  .offer-impact span {
+    max-width: 52%;
+    text-align: right;
+    line-height: 1.35;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .resolution-modal {
     animation: none !important;
