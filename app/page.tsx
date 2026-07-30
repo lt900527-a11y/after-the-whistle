@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { annualChapters } from "./annual-chapters";
 import {
+  findRealWorldEvent,
+  findRealWorldEventByAge,
+  type CameoChoice,
+} from "./real-world-events";
+import {
   allClubs,
   confederations,
   evaluateSeasonAwards,
@@ -68,6 +73,7 @@ type GameState = {
   reputation: number;
   trophies: string[];
   seasonAwards: { age: number; year: number; items: string[] }[];
+  pendingCameoId?: string | null;
   history: { age: number; title: string; note: string }[];
 };
 
@@ -389,6 +395,7 @@ const baseState: GameState = {
   reputation: 4,
   trophies: [],
   seasonAwards: [],
+  pendingCameoId: null,
   history: [],
 };
 
@@ -435,6 +442,10 @@ export default function Home() {
         ? 100
         : Math.round((game.chapter / chapters.length) * 100);
   const currentClub = useMemo(() => findClub(game.clubId), [game.clubId]);
+  const activeCameo = findRealWorldEvent(game.pendingCameoId);
+  const upcomingCameo = current
+    ? findRealWorldEventByAge(current.age)
+    : undefined;
 
   const ending = useMemo(() => {
     const score =
@@ -492,6 +503,7 @@ export default function Home() {
   };
 
   const choose = (choice: Choice) => {
+    const cameo = findRealWorldEventByAge(current.age);
     setGame((prev) => {
       const next = { ...prev } as GameState;
       Object.entries(choice.effects).forEach(([key, amount]) => {
@@ -533,6 +545,39 @@ export default function Home() {
             : choice.note,
         },
       ];
+      if (cameo) {
+        next.pendingCameoId = cameo.id;
+      } else if (prev.chapter === chapters.length - 1) {
+        next.phase = "ending";
+      } else {
+        next.chapter += 1;
+      }
+      return next;
+    });
+  };
+
+  const chooseCameo = (choice: CameoChoice) => {
+    if (!activeCameo) return;
+    setGame((prev) => {
+      const next = { ...prev } as GameState;
+      Object.entries(choice.effects).forEach(([key, amount]) => {
+        const stat = key as StatKey;
+        const currentValue = next[stat] as number;
+        const raw = currentValue + (amount ?? 0);
+        next[stat] =
+          (["energy", "morale", "trust", "ovr", "reputation"].includes(stat)
+            ? clamp(raw)
+            : Math.max(0, raw)) as never;
+      });
+      next.history = [
+        ...next.history,
+        {
+          age: activeCameo.age,
+          title: `与 ${activeCameo.star} 的互动：${choice.title}`,
+          note: choice.note,
+        },
+      ];
+      next.pendingCameoId = null;
       if (prev.chapter === chapters.length - 1) {
         next.phase = "ending";
       } else {
@@ -837,6 +882,13 @@ export default function Home() {
               <p className="story-kicker">{current.kicker}</p>
               <h1>{current.title}</h1>
               <p className="story-copy">{current.story}</p>
+              {upcomingCameo && (
+                <div className="reality-teaser">
+                  <span>REAL WORLD CROSSOVER</span>
+                  <strong>本年可能触发：{upcomingCameo.star}</strong>
+                  <p>{upcomingCameo.tag}</p>
+                </div>
+              )}
               <div className="decision-rule">
                 <span>你会怎么做？</span>
                 <i />
@@ -1043,8 +1095,62 @@ export default function Home() {
 
       <footer className="site-footer">
         <p>九十分钟后 · 原创足球文字生涯游戏</p>
-        <p>真实俱乐部名称与队徽仅用于识别 · 联赛强度与球队定位为游戏判断</p>
+        <p>真实人物仅作文化联动 · 具体对话与互动均为游戏虚构</p>
       </footer>
+
+      {activeCameo && (
+        <div className="modal-backdrop cameo-backdrop" role="presentation">
+          <section
+            className="modal cameo-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cameo-title"
+          >
+            <header className="cameo-head">
+              <div>
+                <p className="overline">{activeCameo.tag}</p>
+                <span>EXTRA TIME / 突发互动</span>
+              </div>
+              <strong>{activeCameo.age}</strong>
+            </header>
+            <p className="cameo-star">{activeCameo.star}</p>
+            <h2 id="cameo-title">{activeCameo.headline}</h2>
+            <p className="cameo-story">{activeCameo.story}</p>
+            <div className="reality-source">
+              <span>现实背景</span>
+              <p>{activeCameo.reality}</p>
+              <a
+                href={activeCameo.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                查看出处：{activeCameo.sourceLabel} ↗
+              </a>
+            </div>
+            <div className="cameo-choice-list">
+              {activeCameo.choices.map((choice, index) => (
+                <button
+                  key={choice.title}
+                  onClick={() => chooseCameo(choice)}
+                >
+                  <span className="choice-letter">
+                    {String.fromCharCode(65 + index)}
+                  </span>
+                  <span>
+                    <small>{choice.eyebrow}</small>
+                    <strong>{choice.title}</strong>
+                    <p>{choice.copy}</p>
+                  </span>
+                  <em>{choice.impact}</em>
+                </button>
+              ))}
+            </div>
+            <p className="fiction-note">
+              ※ 现实背景来自公开报道；本弹窗中的相遇、对话和后果均为虚构游戏剧情。
+            </p>
+          </section>
+        </div>
+      )}
 
       {showClubPicker && (
         <div className="modal-backdrop" role="presentation">
@@ -1185,6 +1291,13 @@ export default function Home() {
                 <p>
                   <strong>竞争真实足球荣誉</strong>
                   联赛冠军、洲际冠军、世界杯、金球奖、国际足联年度最佳等会按赛季表现评选；任何大洲都有机会。
+                </p>
+              </li>
+              <li>
+                <span>05</span>
+                <p>
+                  <strong>触发现实足球联动</strong>
+                  部分年份会出现球星、庆祝动作和网络名梗。现实背景附有出处，具体互动属于虚构剧情。
                 </p>
               </li>
             </ol>
