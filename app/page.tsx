@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { annualChapters } from "./annual-chapters";
 import {
   findRealWorldEvent,
-  findRealWorldEventByAge,
+  findRealWorldEventForCareer,
   type CameoChoice,
 } from "./real-world-events";
 import {
@@ -128,6 +128,7 @@ type Resolution = {
   offerAfter: boolean;
   advanceAfter: boolean;
   goalBurst: boolean;
+  awards: string[];
 };
 
 const origins = [
@@ -849,9 +850,19 @@ export default function Home() {
         ? 100
         : Math.round((game.chapter / chapters.length) * 100);
   const currentClub = useMemo(() => findClub(game.clubId), [game.clubId]);
-  const activeCameo = findRealWorldEvent(game.pendingCameoId);
+  const realWorldContext = {
+    age: current?.age ?? 14,
+    nationality: game.nationality,
+    clubId: game.clubId,
+    leagueId: game.leagueId,
+    careerSeed: game.careerSeed,
+  };
+  const activeCameo = findRealWorldEvent(
+    game.pendingCameoId,
+    realWorldContext,
+  );
   const upcomingCameo = current
-    ? findRealWorldEventByAge(current.age)
+    ? findRealWorldEventForCareer(realWorldContext)
     : undefined;
   const usedBuildPoints = Object.values(game.build).reduce(
     (total, value) => total + value,
@@ -1043,6 +1054,22 @@ export default function Home() {
     const beforeOvr = game.ovr;
     const afterOvr = clamp(beforeOvr + ovrDelta);
     const seasonYear = Number.parseInt(current.year.slice(0, 4), 10);
+    const awards = evaluateSeasonAwards({
+      age: current.age,
+      year: seasonYear,
+      ovr: afterOvr,
+      reputation: clamp(
+        game.reputation + (choice.effects.reputation ?? 0),
+      ),
+      morale: clamp(game.morale + (choice.effects.morale ?? 0)),
+      clubId: game.clubId,
+      nationality: game.nationality,
+      nationalConfederation: game.nationalConfederation,
+      seasonApps: apps,
+      seasonGoals: goals,
+      seasonAssists: assists,
+    });
+    const earned = [...(choice.trophy ? [choice.trophy] : []), ...awards];
     setGame((prev) => {
       const next = {
         ...prev,
@@ -1065,20 +1092,6 @@ export default function Home() {
       });
       next.rating = rating;
       next.peakOvr = Math.max(next.peakOvr, next.ovr);
-      const awards = evaluateSeasonAwards({
-        age: current.age,
-        year: seasonYear,
-        ovr: next.ovr,
-        reputation: next.reputation,
-        morale: next.morale,
-        clubId: next.clubId,
-        nationality: next.nationality,
-        nationalConfederation: next.nationalConfederation,
-        seasonApps: apps,
-        seasonGoals: goals,
-        seasonAssists: assists,
-      });
-      const earned = [...(choice.trophy ? [choice.trophy] : []), ...awards];
       if (earned.length) next.trophies = [...next.trophies, ...earned];
       next.seasonAwards = [
         ...next.seasonAwards,
@@ -1096,10 +1109,16 @@ export default function Home() {
       ];
       return next;
     });
-    setQueuedCameoId(findRealWorldEventByAge(current.age)?.id ?? null);
+    setQueuedCameoId(upcomingCameo?.id ?? null);
     setResolution({
       kind: "season",
-      title: rating >= 8.5 ? "赛季封神" : rating >= 7.5 ? "强势成长" : "赛季结算",
+      title: earned.length
+        ? "荣誉解锁"
+        : rating >= 8.5
+          ? "赛季封神"
+          : rating >= 7.5
+            ? "强势成长"
+            : "赛季结算",
       note: choice.note,
       beforeOvr,
       afterOvr,
@@ -1119,6 +1138,7 @@ export default function Home() {
           (game.careerSeed + current.age * 17) % 100 < 22),
       advanceAfter: true,
       goalBurst: goals > 0,
+      awards: earned,
     });
   };
 
@@ -1173,6 +1193,7 @@ export default function Home() {
       offerAfter: false,
       advanceAfter: offerContext === "season",
       goalBurst: false,
+      awards: [],
     });
   };
 
@@ -1193,6 +1214,12 @@ export default function Home() {
     }
     advanceCareer();
   };
+
+  useEffect(() => {
+    if (!resolution) return;
+    const timer = window.setTimeout(continueResolution, 1000);
+    return () => window.clearTimeout(timer);
+  }, [resolution]);
 
   const chooseCameo = (choice: CameoChoice) => {
     if (!activeCameo || resolution) return;
@@ -1239,6 +1266,7 @@ export default function Home() {
       offerAfter: false,
       advanceAfter: true,
       goalBurst: (choice.effects.goals ?? 0) > 0,
+      awards: [],
     });
   };
 
@@ -1508,7 +1536,9 @@ export default function Home() {
               <div>
                 <span>{game.nationality} · {age} 岁</span>
                 <strong>{game.name}</strong>
-                <small>{game.club}</small>
+                <small>
+                  {currentClub ? getClubShortName(currentClub.team) : game.club}
+                </small>
               </div>
             </div>
             <div className="mobile-quick-stats">
@@ -1553,7 +1583,8 @@ export default function Home() {
                   <span>{game.nationality}国家队 · {game.origin}出身</span>
                   <h2>{game.name}</h2>
                   <p>
-                    {game.club} · {age} 岁
+                    {currentClub ? getClubShortName(currentClub.team) : game.club} ·{" "}
+                    {age} 岁
                   </p>
                 </div>
               </div>
@@ -1621,9 +1652,9 @@ export default function Home() {
               <p className="story-copy">{current.story}</p>
               {upcomingCameo && (
                 <div className="reality-teaser">
-                  <span>REAL WORLD CROSSOVER</span>
-                  <strong>本年可能触发：{upcomingCameo.star}</strong>
-                  <p>{upcomingCameo.tag}</p>
+                  <span>MATCH CONTEXT</span>
+                  <strong>{upcomingCameo.tag}</strong>
+                  <p>{upcomingCameo.star}</p>
                 </div>
               )}
               <div className="decision-rule">
@@ -1930,7 +1961,7 @@ export default function Home() {
                       {found.league.country} · {found.league.name}
                     </span>
                     <strong className="offer-club-name">
-                      {found.team.localName}
+                      {getClubShortName(found.team)}
                     </strong>
                     <span className="offer-level">
                       {found.team.level} · {found.league.band}
@@ -1986,9 +2017,20 @@ export default function Home() {
             <p className="overline">
               {resolution.kind === "contract"
                 ? "CONTRACT COMPLETE"
-                : "SEASON COMPLETE"}
+                : resolution.awards.length
+                  ? "HONOUR UNLOCKED"
+                  : "SEASON COMPLETE"}
             </p>
             <h2 id="resolution-title">{resolution.title}</h2>
+            {resolution.awards.length > 0 && (
+              <div className="resolution-awards" aria-label="新获得的荣誉">
+                <span aria-hidden="true">◆</span>
+                <div>
+                  <small>新荣誉</small>
+                  <strong>{resolution.awards.slice(0, 2).join(" · ")}</strong>
+                </div>
+              </div>
+            )}
             <div className="resolution-ovr">
               <div>
                 <span>此前</span>
@@ -2046,16 +2088,7 @@ export default function Home() {
               </>
             )}
             <p className="resolution-note">{resolution.note}</p>
-            <button className="primary-button" onClick={continueResolution}>
-              <span>
-                {resolution.offerAfter
-                  ? "查看俱乐部报价"
-                  : resolution.advanceAfter
-                    ? "继续生涯"
-                    : "进入首个赛季"}
-              </span>
-              <span aria-hidden="true">▶</span>
-            </button>
+            <i className="auto-dismiss-track" aria-hidden="true" />
           </section>
         </div>
       )}
@@ -2088,46 +2121,158 @@ export default function Home() {
 
 const crestCache = new Map<string, string>();
 
-const kitColorOverrides: Record<string, [string, string, string]> = {
-  shandong: ["#f14b38", "#ffffff", "#f4c63d"],
-  "shanghai-port": ["#d92f35", "#ffffff", "#111111"],
-  "beijing-guoan": ["#1ba45c", "#f2ff3f", "#111111"],
-  "man-city": ["#72c8ef", "#ffffff", "#1d3152"],
-  arsenal: ["#e52b3b", "#ffffff", "#15356e"],
-  liverpool: ["#c8102e", "#ffffff", "#00b2a9"],
-  "real-madrid": ["#f8f7f1", "#b69cf6", "#1d2447"],
-  barcelona: ["#233a8b", "#a51e4d", "#f0bd25"],
-  atletico: ["#d7193f", "#ffffff", "#1c3f77"],
-  bayern: ["#dc1638", "#ffffff", "#163d8d"],
-  dortmund: ["#f6dc20", "#111111", "#ffffff"],
-  inter: ["#1464d2", "#101010", "#ffffff"],
-  milan: ["#d71939", "#111111", "#ffffff"],
-  juventus: ["#f8f8f3", "#111111", "#e7c95b"],
-  psg: ["#17294e", "#e73445", "#ffffff"],
-  "al-nassr": ["#f3df22", "#1c55a1", "#ffffff"],
-  "inter-miami": ["#f6a5bd", "#161616", "#ffffff"],
-  boca: ["#183c83", "#f2ca2e", "#ffffff"],
-  "river-plate": ["#f8f7f1", "#d9263e", "#111111"],
-  flamengo: ["#d71939", "#111111", "#ffffff"],
-  palmeiras: ["#147548", "#ffffff", "#d2a94e"],
+const clubShortNames: Record<string, string> = {
+  shandong: "泰山",
+  "shanghai-port": "海港",
+  "beijing-guoan": "国安",
+  "man-city": "曼城",
+  arsenal: "阿森纳",
+  liverpool: "利物浦",
+  "real-madrid": "皇马",
+  barcelona: "巴萨",
+  atletico: "马竞",
+  bayern: "拜仁",
+  dortmund: "多特",
+  leverkusen: "药厂",
+  inter: "国米",
+  milan: "米兰",
+  juventus: "尤文",
+  psg: "巴黎",
+  marseille: "马赛",
+  lyon: "里昂",
+  sporting: "葡体",
+  psv: "PSV",
+  feyenoord: "费耶诺德",
+  galatasaray: "加拉塔萨雷",
+  fenerbahce: "费内巴切",
+  besiktas: "贝西克塔斯",
+  rangers: "流浪者",
+  "yokohama-fm": "横滨水手",
+  jeonbuk: "全北现代",
+  "al-hilal": "新月",
+  "al-nassr": "胜利",
+  "al-ittihad": "联合",
+  "river-plate": "河床",
+  boca: "博卡",
+  "inter-miami": "迈阿密",
+  "club-america": "美洲",
+  "orlando-pirates": "海盗",
+  "kaizer-chiefs": "酋长",
+  "auckland-city": "奥克兰城",
 };
 
-const kitFallbacks: [string, string, string][] = [
-  ["#5537d8", "#dfff36", "#ffffff"],
-  ["#006bff", "#ffffff", "#ff4f69"],
-  ["#12a879", "#e7ff4d", "#0a2440"],
-  ["#ff5c35", "#ffffff", "#171717"],
-  ["#1c2d5a", "#f6d33a", "#ffffff"],
-  ["#a92462", "#72e4d1", "#ffffff"],
+function getClubShortName(club: ClubProfile) {
+  return (
+    clubShortNames[club.id] ??
+    club.localName.replace(/[（(].*?[）)]/g, "").slice(0, 6)
+  );
+}
+
+type KitPattern =
+  | "solid"
+  | "sleeves"
+  | "stripes"
+  | "hoops"
+  | "sash"
+  | "halves"
+  | "band"
+  | "pinstripes";
+
+type KitSpec = {
+  primary: string;
+  secondary: string;
+  accent: string;
+  pattern: KitPattern;
+};
+
+const kitSpecs: Record<string, KitSpec> = {
+  shandong: { primary: "#f05a35", secondary: "#ffffff", accent: "#153d85", pattern: "solid" },
+  "shanghai-port": { primary: "#d71e2b", secondary: "#ffffff", accent: "#111111", pattern: "solid" },
+  "beijing-guoan": { primary: "#18a551", secondary: "#dfff2f", accent: "#111111", pattern: "solid" },
+  "man-city": { primary: "#73c9ed", secondary: "#ffffff", accent: "#253a64", pattern: "solid" },
+  arsenal: { primary: "#e30613", secondary: "#ffffff", accent: "#152b58", pattern: "sleeves" },
+  liverpool: { primary: "#c8102e", secondary: "#ffffff", accent: "#00b2a9", pattern: "solid" },
+  "real-madrid": { primary: "#faf9f3", secondary: "#173c35", accent: "#e64142", pattern: "solid" },
+  barcelona: { primary: "#153b8d", secondary: "#a71945", accent: "#f0bb20", pattern: "stripes" },
+  atletico: { primary: "#d7193f", secondary: "#ffffff", accent: "#153b72", pattern: "stripes" },
+  bayern: { primary: "#dc1738", secondary: "#ffffff", accent: "#173a86", pattern: "solid" },
+  dortmund: { primary: "#f5dd18", secondary: "#111111", accent: "#ffffff", pattern: "solid" },
+  leverkusen: { primary: "#d71f2b", secondary: "#111111", accent: "#ffffff", pattern: "stripes" },
+  inter: { primary: "#1464d2", secondary: "#111111", accent: "#ffffff", pattern: "stripes" },
+  milan: { primary: "#d71939", secondary: "#111111", accent: "#ffffff", pattern: "stripes" },
+  juventus: { primary: "#fafafa", secondary: "#111111", accent: "#d5aa52", pattern: "stripes" },
+  psg: { primary: "#16294e", secondary: "#e73445", accent: "#ffffff", pattern: "band" },
+  marseille: { primary: "#ffffff", secondary: "#56c4e9", accent: "#173a70", pattern: "solid" },
+  lyon: { primary: "#ffffff", secondary: "#1c4ba3", accent: "#e5243f", pattern: "band" },
+  benfica: { primary: "#e21e2b", secondary: "#ffffff", accent: "#d4af37", pattern: "solid" },
+  porto: { primary: "#1768b3", secondary: "#ffffff", accent: "#d92238", pattern: "stripes" },
+  sporting: { primary: "#148046", secondary: "#ffffff", accent: "#111111", pattern: "hoops" },
+  ajax: { primary: "#ffffff", secondary: "#d7192d", accent: "#111111", pattern: "band" },
+  psv: { primary: "#e32231", secondary: "#ffffff", accent: "#111111", pattern: "stripes" },
+  feyenoord: { primary: "#e31b2d", secondary: "#ffffff", accent: "#111111", pattern: "halves" },
+  galatasaray: { primary: "#f4b51c", secondary: "#a71930", accent: "#ffffff", pattern: "halves" },
+  fenerbahce: { primary: "#f4da23", secondary: "#132c73", accent: "#ffffff", pattern: "stripes" },
+  besiktas: { primary: "#ffffff", secondary: "#111111", accent: "#e32231", pattern: "stripes" },
+  celtic: { primary: "#138247", secondary: "#ffffff", accent: "#111111", pattern: "hoops" },
+  rangers: { primary: "#1b4b9a", secondary: "#ffffff", accent: "#d72331", pattern: "solid" },
+  boca: { primary: "#163c83", secondary: "#f2ca2e", accent: "#ffffff", pattern: "band" },
+  "river-plate": { primary: "#fafafa", secondary: "#d9263e", accent: "#111111", pattern: "sash" },
+  flamengo: { primary: "#d71939", secondary: "#111111", accent: "#ffffff", pattern: "hoops" },
+  palmeiras: { primary: "#147548", secondary: "#ffffff", accent: "#d2a94e", pattern: "solid" },
+  corinthians: { primary: "#fafafa", secondary: "#111111", accent: "#d51f2b", pattern: "solid" },
+  "inter-miami": { primary: "#f6a5bd", secondary: "#161616", accent: "#ffffff", pattern: "pinstripes" },
+  lafc: { primary: "#111111", secondary: "#c8a96a", accent: "#ffffff", pattern: "solid" },
+  "club-america": { primary: "#f5df39", secondary: "#142e74", accent: "#d92439", pattern: "solid" },
+  "al-hilal": { primary: "#2358c7", secondary: "#ffffff", accent: "#1bb8dd", pattern: "solid" },
+  "al-nassr": { primary: "#f3df22", secondary: "#1c55a1", accent: "#ffffff", pattern: "halves" },
+  "al-ittihad": { primary: "#111111", secondary: "#f3d528", accent: "#ffffff", pattern: "stripes" },
+  "kashima": { primary: "#d81f35", secondary: "#172d5a", accent: "#ffffff", pattern: "solid" },
+  urawa: { primary: "#e51e32", secondary: "#111111", accent: "#ffffff", pattern: "solid" },
+  "yokohama-fm": { primary: "#1a63b5", secondary: "#ffffff", accent: "#e11d36", pattern: "stripes" },
+  ulsan: { primary: "#1868bf", secondary: "#f1c324", accent: "#ffffff", pattern: "solid" },
+  jeonbuk: { primary: "#16804c", secondary: "#ffffff", accent: "#d4c43c", pattern: "solid" },
+  "fc-seoul": { primary: "#d92431", secondary: "#111111", accent: "#ffffff", pattern: "stripes" },
+  "al-ahly": { primary: "#d91e2b", secondary: "#ffffff", accent: "#d7b14c", pattern: "solid" },
+  zamalek: { primary: "#ffffff", secondary: "#d91e2b", accent: "#111111", pattern: "band" },
+  sundowns: { primary: "#f4d328", secondary: "#1c5f35", accent: "#2853a0", pattern: "solid" },
+};
+
+const kitFallbacks: KitSpec[] = [
+  { primary: "#1d5cb5", secondary: "#ffffff", accent: "#d62336", pattern: "solid" },
+  { primary: "#d92338", secondary: "#ffffff", accent: "#162b59", pattern: "solid" },
+  { primary: "#168057", secondary: "#ffffff", accent: "#d9b52e", pattern: "solid" },
+  { primary: "#f4d32a", secondary: "#142c6e", accent: "#ffffff", pattern: "solid" },
+  { primary: "#ffffff", secondary: "#111111", accent: "#d82338", pattern: "pinstripes" },
 ];
 
-function getKitColors(club: ClubProfile) {
-  if (kitColorOverrides[club.id]) return kitColorOverrides[club.id];
+function getKitSpec(club: ClubProfile) {
+  if (kitSpecs[club.id]) return kitSpecs[club.id];
   const score = [...club.id].reduce(
     (total, character) => total + character.charCodeAt(0),
     0,
   );
   return kitFallbacks[score % kitFallbacks.length];
+}
+
+function getKitBackground(spec: KitSpec) {
+  switch (spec.pattern) {
+    case "stripes":
+      return `repeating-linear-gradient(90deg, ${spec.primary} 0 18%, ${spec.secondary} 18% 36%)`;
+    case "pinstripes":
+      return `repeating-linear-gradient(90deg, ${spec.primary} 0 20%, ${spec.secondary} 20% 23%)`;
+    case "hoops":
+      return `repeating-linear-gradient(0deg, ${spec.primary} 0 15%, ${spec.secondary} 15% 30%)`;
+    case "halves":
+      return `linear-gradient(90deg, ${spec.primary} 0 50%, ${spec.secondary} 50%)`;
+    case "band":
+      return `linear-gradient(90deg, ${spec.primary} 0 34%, ${spec.secondary} 34% 66%, ${spec.primary} 66%)`;
+    case "sash":
+      return `linear-gradient(120deg, ${spec.primary} 0 39%, ${spec.secondary} 40% 57%, ${spec.primary} 58%)`;
+    case "sleeves":
+      return `linear-gradient(90deg, ${spec.secondary} 0 19%, ${spec.primary} 19% 81%, ${spec.secondary} 81%)`;
+    default:
+      return `linear-gradient(145deg, ${spec.primary}, color-mix(in srgb, ${spec.primary} 82%, #000))`;
+  }
 }
 
 function TeamKit({
@@ -2137,11 +2282,12 @@ function TeamKit({
   club: ClubProfile;
   variant?: "mini" | "card" | "hero";
 }) {
-  const [primary, secondary, accent] = getKitColors(club);
+  const spec = getKitSpec(club);
   const style = {
-    "--kit-primary": primary,
-    "--kit-secondary": secondary,
-    "--kit-accent": accent,
+    "--kit-primary": spec.primary,
+    "--kit-secondary": spec.secondary,
+    "--kit-accent": spec.accent,
+    "--kit-background": getKitBackground(spec),
   } as CSSProperties;
 
   return (
@@ -2151,43 +2297,87 @@ function TeamKit({
       aria-label={`${club.localName}球衣`}
     >
       <i className="kit-shirt">
-        <b>{club.localName.slice(0, 1)}</b>
+        <b>{getClubShortName(club).slice(0, 1)}</b>
       </i>
     </span>
   );
 }
 
+const crestSlugOverrides: Record<string, string> = {
+  "man-city": "manchester-city",
+  barcelona: "fc-barcelona",
+  bayern: "bayern-munich",
+  dortmund: "borussia-dortmund",
+  leverkusen: "bayer-leverkusen",
+  inter: "inter-milan",
+  milan: "ac-milan",
+  psg: "paris-saint-germain",
+  marseille: "olympique-marseille",
+  lyon: "olympique-lyon",
+  sporting: "sporting-cp",
+  psv: "psv-eindhoven",
+  rangers: "rangers-fc",
+  shandong: "shandong-taishan",
+  "shanghai-port": "shanghai-port-fc",
+  "beijing-guoan": "beijing-guoan-fc",
+  kashima: "kashima-antlers",
+  urawa: "urawa-red-diamonds",
+  "yokohama-fm": "yokohama-f-marinos",
+  jeonbuk: "jeonbuk-hyundai-motors",
+  "fc-seoul": "fc-seoul",
+  "al-hilal": "al-hilal",
+  "al-nassr": "al-nassr",
+  "al-ittihad": "al-ittihad",
+  "river-plate": "river-plate",
+  boca: "boca-juniors",
+  "inter-miami": "inter-miami",
+  "club-america": "club-america",
+  "al-ahly": "al-ahly",
+};
+
+function footyLogosCrest(club: ClubProfile) {
+  const slug = crestSlugOverrides[club.id] ?? club.id;
+  return `https://pub-3bd35431294c47068cbf31a95d572166.r2.dev/logos/${slug}/${slug}-logo-footylogos.png`;
+}
+
 function TeamCrest({ club, size = 48 }: { club: ClubProfile; size?: number }) {
-  const [source, setSource] = useState(() => crestCache.get(club.id) ?? "");
+  const [source, setSource] = useState(
+    () => crestCache.get(club.id) ?? footyLogosCrest(club),
+  );
+  const [fallbackRequested, setFallbackRequested] = useState(false);
 
   useEffect(() => {
     let active = true;
     const cached = crestCache.get(club.id);
-    if (cached) {
-      Promise.resolve().then(() => {
-        if (active) setSource(cached);
-      });
-      return () => {
-        active = false;
-      };
-    }
     Promise.resolve().then(() => {
-      if (active) setSource("");
+      if (!active) return;
+      setFallbackRequested(false);
+      setSource(cached ?? footyLogosCrest(club));
     });
+    return () => {
+      active = false;
+    };
+  }, [club.id]);
+
+  const requestWikipediaFallback = () => {
+    if (fallbackRequested) {
+      setSource("");
+      return;
+    }
+    setFallbackRequested(true);
     fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${club.wiki}`)
       .then((response) => (response.ok ? response.json() : Promise.reject()))
       .then((data) => {
         const image = data.thumbnail?.source ?? data.originalimage?.source;
-        if (active && image) {
+        if (image) {
           crestCache.set(club.id, image);
           setSource(image);
+        } else {
+          setSource("");
         }
       })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, [club.id, club.wiki]);
+      .catch(() => setSource(""));
+  };
 
   return (
     <span
@@ -2196,9 +2386,14 @@ function TeamCrest({ club, size = 48 }: { club: ClubProfile; size?: number }) {
       aria-label={`${club.localName}队徽`}
     >
       {source ? (
-        <img src={source} alt={`${club.localName}队徽`} />
+        <img
+          src={source}
+          alt={`${club.localName}队徽`}
+          onLoad={() => crestCache.set(club.id, source)}
+          onError={requestWikipediaFallback}
+        />
       ) : (
-        <b>{club.localName.slice(0, 2)}</b>
+        <b>{getClubShortName(club).slice(0, 2)}</b>
       )}
     </span>
   );
