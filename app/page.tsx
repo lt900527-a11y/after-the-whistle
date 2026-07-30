@@ -15,6 +15,7 @@ import {
   type ClubProfile,
   type Confederation,
 } from "./world-football";
+import { crestData } from "./crest-data";
 
 type Phase = "setup" | "career" | "ending";
 type Position =
@@ -2666,6 +2667,10 @@ const crestSlugOverrides: Record<string, string> = {
   "al-ahly": "al-ahly",
 };
 
+function localCrest(club: ClubProfile) {
+  return crestData[club.id] ?? "";
+}
+
 function footyLogosCrest(club: ClubProfile) {
   const slug = crestSlugOverrides[club.id] ?? club.id;
   return `https://pub-3bd35431294c47068cbf31a95d572166.r2.dev/logos/${slug}/${slug}-logo-footylogos.png`;
@@ -2673,8 +2678,11 @@ function footyLogosCrest(club: ClubProfile) {
 
 function TeamCrest({ club, size = 48 }: { club: ClubProfile; size?: number }) {
   const [source, setSource] = useState(
-    () => crestCache.get(club.id) ?? footyLogosCrest(club),
+    () =>
+      crestCache.get(club.id) ??
+      (localCrest(club) || footyLogosCrest(club)),
   );
+  const [remoteRequested, setRemoteRequested] = useState(false);
   const [fallbackRequested, setFallbackRequested] = useState(false);
 
   useEffect(() => {
@@ -2682,8 +2690,9 @@ function TeamCrest({ club, size = 48 }: { club: ClubProfile; size?: number }) {
     const cached = crestCache.get(club.id);
     Promise.resolve().then(() => {
       if (!active) return;
+      setRemoteRequested(false);
       setFallbackRequested(false);
-      setSource(cached ?? footyLogosCrest(club));
+      setSource(cached ?? (localCrest(club) || footyLogosCrest(club)));
     });
     return () => {
       active = false;
@@ -2691,6 +2700,11 @@ function TeamCrest({ club, size = 48 }: { club: ClubProfile; size?: number }) {
   }, [club.id]);
 
   const requestWikipediaFallback = () => {
+    if (localCrest(club) && !remoteRequested) {
+      setRemoteRequested(true);
+      setSource(footyLogosCrest(club));
+      return;
+    }
     if (fallbackRequested) {
       setSource("");
       return;
