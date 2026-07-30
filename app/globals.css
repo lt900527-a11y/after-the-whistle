@@ -4418,6 +4418,22 @@ a:focus-visible {
 
 /* Mobile hardening: compact rows and allow long Chinese/club copy to wrap. */
 @media (max-width: 720px) {
+  .career-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "story"
+      "player"
+      "season";
+  }
+
+  .story-panel,
+  .player-panel,
+  .season-panel {
+    width: 100%;
+    min-width: 0;
+    grid-column: 1;
+  }
+
   .setup-intro {
     min-height: 250px;
     padding: 20px 18px;
@@ -4538,6 +4554,11 @@ a:focus-visible {
 
   .mobile-quick-stats {
     grid-column: 1 / -1;
+  }
+
+  .mobile-quick-stats .mobile-ovr-stat span,
+  .mobile-quick-stats .mobile-ovr-stat strong {
+    color: var(--night);
   }
 
   .story-panel,
