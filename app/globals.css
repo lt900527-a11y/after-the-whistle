@@ -3362,6 +3362,10 @@ a:focus-visible {
   color: #ff667f !important;
 }
 
+.volatile {
+  color: #ffd45f !important;
+}
+
 .resolution-backdrop {
   z-index: 100;
   padding: 14px;
