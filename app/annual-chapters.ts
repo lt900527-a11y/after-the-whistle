@@ -13,7 +13,7 @@ export const annualChapters = [
         copy: "不再传安全球，用每一次触球逼球探记住你。",
         impact: "能力 ↑↑ · 信任 ↓",
         effects: { ovr: 4, trust: -7, reputation: 9, goals: 2, value: 12 },
-        note: "你完成帽子戏法，队友却在终场后绕开了你。球探递来一张去省城的车票。",
+        note: "你在暴雨里一次次制造威胁，队友却在终场后绕开了你。球探递来一张去省城的车票。",
       },
       {
         eyebrow: "让家人安心",
@@ -131,7 +131,7 @@ export const annualChapters = [
         copy: "保留学籍，在校园联赛等待下一次机会。",
         impact: "士气 ↑ · 身价增长慢",
         effects: { ovr: 1, morale: 12, reputation: 5, apps: 12, goals: 5, assists: 4, value: 18 },
-        note: "俱乐部撤回合同。半年后，你在大学杯决赛的帽子戏法又把球探引回看台。",
+        note: "俱乐部撤回合同。半年后，你在大学杯决赛的表现又把球探引回看台。",
       },
     ],
   },
@@ -233,7 +233,7 @@ export const annualChapters = [
         copy: "要求把出场上限写进医疗协议。",
         impact: "信任 ↑↑ · 能力 ↑",
         effects: { ovr: 3, energy: -7, trust: 12, apps: 19, goals: 5, assists: 8, value: 105 },
-        note: "你在八强战送出致命助攻。教练第一次允许球员参与决定风险。",
+        note: "你在八强战策动致命进攻。教练第一次允许球员参与决定风险。",
       },
     ],
   },
@@ -356,7 +356,7 @@ export const annualChapters = [
         copy: "足球是工作，忠诚不能替你支付未来。",
         impact: "身价 ↑↑↑ · 信任 ↓↓↓",
         effects: { ovr: 4, trust: -24, reputation: 20, morale: -5, apps: 34, goals: 14, assists: 10, value: 620 },
-        note: "亮相仪式外有人烧掉你的旧球衣。三个月后，你在德比进球却没有庆祝。",
+        note: "亮相仪式外有人烧掉你的旧球衣。三个月后，你在德比成为焦点，却没有庆祝。",
       },
       {
         eyebrow: "忠诚定价",
@@ -391,7 +391,7 @@ export const annualChapters = [
         impact: "名气 ↑↑↑ · 士气风险",
         effects: { reputation: 22, morale: -12, energy: -8, apps: 36, goals: 14, assists: 9, value: 330 },
         trophy: "世界杯入场券",
-        note: "你助攻绝杀，国家晋级。庆典中，妹妹发来一句：手术成功，她问你赢了吗。",
+        note: "你参与最后的制胜进攻，国家晋级。庆典中，妹妹发来一句：手术成功，她问你赢了吗。",
       },
       {
         eyebrow: "家人在前",
@@ -805,7 +805,7 @@ export const annualChapters = [
         copy: "让双脚回答年龄，而不是让履历回答。",
         impact: "能力 ↑ · 名气 ↓",
         effects: { ovr: 2, morale: -5, reputation: -8, energy: -10, apps: 20, goals: 6, value: 35 },
-        note: "你在对抗赛送出三次助攻。试训结束时，18 岁的孩子们排队找你签名。",
+        note: "你在对抗赛连续三次撕开防线。试训结束时，18 岁的孩子们排队找你签名。",
       },
       {
         eyebrow: "自己制造机会",
@@ -882,7 +882,7 @@ export const annualChapters = [
         copy: "把所有愤怒留到周末的首发名单。",
         impact: "能力 ↑↑ · 压力 ↑",
         effects: { ovr: 3, energy: -14, morale: 6, trust: 8, apps: 24, goals: 10, assists: 7, value: 20 },
-        note: "你连续五场进球。第六场前，主帅亲手把队长袖标递给了你。",
+        note: "你连续五场成为关键人物。第六场前，主帅亲手把队长袖标递给了你。",
       },
       {
         eyebrow: "揭开行业",
@@ -909,7 +909,7 @@ export const annualChapters = [
         impact: "传奇 ↑↑↑ · 健康 ↓↓",
         effects: { reputation: 30, energy: -24, morale: 14, apps: 6, goals: 2, assists: 2, value: 20 },
         trophy: "洲际冠军",
-        note: "你在决赛加时送出制胜助攻。终场哨响后，你先摸了摸胸口，才举起双手。",
+        note: "你在决赛加时参与制胜进攻。终场哨响后，你先摸了摸胸口，才举起双手。",
       },
       {
         eyebrow: "选择活着",
