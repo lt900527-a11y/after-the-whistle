@@ -13,7 +13,6 @@ export const annualChapters = [
         copy: "不再传安全球，用每一次触球逼球探记住你。",
         impact: "能力 ↑↑ · 信任 ↓",
         effects: { ovr: 4, trust: -7, reputation: 9, goals: 2, value: 12 },
-        club: "北湾青训营",
         note: "你完成帽子戏法，队友却在终场后绕开了你。球探递来一张去省城的车票。",
       },
       {
@@ -22,7 +21,6 @@ export const annualChapters = [
         copy: "足球可以再等一年，家里的账单不能。",
         impact: "信任 ↑↑↑ · 成长放缓",
         effects: { trust: 16, morale: 7, ovr: 1, assists: 2, value: 3 },
-        club: "河堤中学",
         note: "你回到小店搬货，每晚关门后独自在路灯下练到十一点。",
       },
       {
@@ -31,7 +29,6 @@ export const annualChapters = [
         copy: "坦白家境，也把选择权重新放回自己手里。",
         impact: "名气 ↑ · 压力 ↑↑",
         effects: { reputation: 12, trust: 8, morale: -4, ovr: 2, value: 8 },
-        club: "北湾青训营",
         note: "球探答应承担食宿，但要求你三个月内进入首发，否则立刻回家。",
       },
     ],
@@ -62,11 +59,10 @@ export const annualChapters = [
       },
       {
         eyebrow: "离开是非地",
-        title: "转投死敌青训",
+        title: "申请转投另一家青训",
         copy: "用下一场德比回答所有传言。",
         impact: "能力 ↑↑ · 仇恨 ↑↑",
         effects: { ovr: 4, reputation: 12, trust: -10, apps: 6, goals: 4, value: 22 },
-        club: "东港少年队",
         note: "德比第 90 分钟，你绝杀旧主。看台上同时响起欢呼和辱骂。",
       },
     ],
@@ -149,29 +145,26 @@ export const annualChapters = [
     choices: [
       {
         eyebrow: "稳定出场",
-        title: "签约「江城航运」",
+        title: "接受稳定出场合同",
         copy: "小舞台，但每一分钟都属于你。",
         impact: "出场 ↑↑↑ · 身价 ↑",
         effects: { ovr: 3, apps: 27, goals: 9, assists: 7, value: 150, trust: 8 },
-        club: "江城航运",
         note: "你穿上 27 号球衣，从首发名单最底端开始了职业生涯。",
       },
       {
         eyebrow: "豪门赌桌",
-        title: "签约「申湾竞技」",
+        title: "接受豪门轮换合同",
         copy: "工资翻倍，也可能整年坐在看台。",
         impact: "能力 ↑↑ · 士气风险",
         effects: { ovr: 5, morale: -7, apps: 11, goals: 3, assists: 3, value: 210, reputation: 8 },
-        club: "申湾竞技",
         note: "你第一次见到数据实验室，也第一次连续十二场没有进入名单。",
       },
       {
         eyebrow: "单程票",
-        title: "远赴「北海联队」",
+        title: "接受海外联赛合同",
         copy: "陌生语言、半职业联赛，没有回程。",
         impact: "能力 ↑ · 名气 ↑↑",
         effects: { ovr: 4, energy: -7, reputation: 15, apps: 31, goals: 12, assists: 6, value: 180 },
-        club: "北海联队",
         note: "第一个冬天你住在洗衣房楼上。春天来时，全城已经会念你的名字。",
       },
     ],
@@ -359,11 +352,10 @@ export const annualChapters = [
     choices: [
       {
         eyebrow: "职业无罪",
-        title: "加盟死敌「王冠城」",
+        title: "接受死敌的三倍薪资",
         copy: "足球是工作，忠诚不能替你支付未来。",
         impact: "身价 ↑↑↑ · 信任 ↓↓↓",
         effects: { ovr: 4, trust: -24, reputation: 20, morale: -5, apps: 34, goals: 14, assists: 10, value: 620 },
-        club: "王冠城",
         note: "亮相仪式外有人烧掉你的旧球衣。三个月后，你在德比进球却没有庆祝。",
       },
       {
@@ -376,11 +368,10 @@ export const annualChapters = [
       },
       {
         eyebrow: "第三条路",
-        title: "当天飞往「蓝岸 1908」",
+        title: "当天飞往第三家俱乐部",
         copy: "避开内战，去完全陌生的联赛。",
         impact: "能力 ↑↑ · 体能 ↓",
         effects: { ovr: 5, energy: -10, reputation: 17, apps: 33, goals: 13, assists: 11, value: 510 },
-        club: "蓝岸 1908",
         note: "机场没有发布会，只有一名举错名字牌的司机。你从零开始。",
       },
     ],
@@ -542,11 +533,10 @@ export const annualChapters = [
       },
       {
         eyebrow: "尊严转身",
-        title: "加盟降级区「铁桥联」",
+        title: "加盟一支降级区球队",
         copy: "从冠军竞争者变成保级队长。",
         impact: "信任 ↑↑↑ · 名气 ↓",
         effects: { trust: 22, reputation: -6, morale: 12, apps: 36, goals: 11, assists: 12, value: -40 },
-        club: "铁桥联",
         note: "最后一轮保级成功时，五万人冲进球场。你第一次知道保级也可以像夺冠。",
       },
       {
@@ -751,11 +741,10 @@ export const annualChapters = [
       },
       {
         eyebrow: "兑现价值",
-        title: "签约「太平洋星队」",
+        title: "签约新大陆球队",
         copy: "离开熟悉的一切，再赚最后一份大合同。",
         impact: "财富 ↑↑↑ · 体能 ↓",
         effects: { energy: -12, reputation: 12, apps: 28, goals: 9, assists: 7, value: 260 },
-        club: "太平洋星队",
         note: "海风、塑料草皮和陌生看台。你重新变回一个需要证明自己的新援。",
       },
       {
@@ -764,7 +753,6 @@ export const annualChapters = [
         copy: "减少出场，把经验变成另一种竞争力。",
         impact: "健康 ↑↑ · 信任 ↑↑",
         effects: { energy: 18, morale: 9, reputation: 10, trust: 15, apps: 12, assists: 4, value: -60 },
-        club: "故乡竞技",
         note: "你第一次站在战术板前讲话。年轻人认真听着，而替补名单上仍有你的名字。",
       },
     ],
@@ -783,7 +771,6 @@ export const annualChapters = [
         copy: "公开告诉所有人，你的生涯只能由自己结束。",
         impact: "名气 ↑↑↑ · 信任 ↓",
         effects: { reputation: 25, trust: -12, morale: 15, apps: 18, goals: 5, value: -40 },
-        club: "故乡竞技",
         note: "舆论逼俱乐部给出一年合同。你留下了，却必须和最不想留下你的主帅共处。",
       },
       {
@@ -792,7 +779,6 @@ export const annualChapters = [
         copy: "把掌声留给这里，把下一年留给自己。",
         impact: "信任 ↑↑ · 名气 ↓",
         effects: { trust: 18, morale: 9, reputation: -5, energy: 4, apps: 25, goals: 8, value: -70 },
-        club: "山城联",
         note: "你含泪绕场一周，第二天却出现在另一座小球场的体检室。",
       },
       {
@@ -801,7 +787,6 @@ export const annualChapters = [
         copy: "没有合同、没有保证，只保留继续比赛的可能。",
         impact: "自由 ↑↑ · 风险 ↑↑",
         effects: { morale: 18, reputation: 12, trust: -6, energy: 7, value: -90 },
-        club: "自由球员",
         note: "告别夜没有出现你的身影。凌晨，你独自在训练场做完了全部体能测试。",
       },
     ],
@@ -820,7 +805,6 @@ export const annualChapters = [
         copy: "让双脚回答年龄，而不是让履历回答。",
         impact: "能力 ↑ · 名气 ↓",
         effects: { ovr: 2, morale: -5, reputation: -8, energy: -10, apps: 20, goals: 6, value: 35 },
-        club: "海角城",
         note: "你在对抗赛送出三次助攻。试训结束时，18 岁的孩子们排队找你签名。",
       },
       {
@@ -829,7 +813,6 @@ export const annualChapters = [
         copy: "把俱乐部不愿承担的判断交给公众。",
         impact: "名气 ↑↑↑ · 争议 ↑",
         effects: { reputation: 22, morale: 8, trust: -6, energy: -8, apps: 17, goals: 5, value: 55 },
-        club: "海角城",
         note: "直播观看破百万。俱乐部在舆论压力下签你，却把“商业价值”写进了合同。",
       },
       {
@@ -838,7 +821,6 @@ export const annualChapters = [
         copy: "不再追逐聚光灯，只追逐每周末的比赛。",
         impact: "快乐 ↑↑↑ · 身价 ↓",
         effects: { morale: 20, trust: 16, reputation: -10, energy: 5, apps: 28, goals: 12, assists: 9, value: -80 },
-        club: "河堤竞技",
         note: "球场只有两千个座位，却场场坐满。卖票的大叔还记得你十四岁时的样子。",
       },
     ],
@@ -970,7 +952,6 @@ export const annualChapters = [
         copy: "宁可俱乐部立刻崩塌，也不让骗局继续。",
         impact: "名气 ↑↑↑ · 俱乐部危机",
         effects: { reputation: 27, trust: 15, morale: -12, apps: 10, value: -100 },
-        club: "自由球员",
         note: "老板被带走，球队被托管。你失去合同，却阻止了更多球迷把积蓄投进去。",
       },
       {
@@ -979,7 +960,6 @@ export const annualChapters = [
         copy: "把俱乐部从一个老板的玩具变成共同资产。",
         impact: "信任 ↑↑↑ · 财富 ↓↓",
         effects: { trust: 30, reputation: 22, morale: 16, energy: -10, apps: 14, assists: 5, value: -180 },
-        club: "人民竞技",
         note: "众筹在最后一小时达标。你同时成了球员、小股东和每场会议最后离开的人。",
       },
     ],
