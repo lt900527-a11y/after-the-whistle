@@ -3846,3 +3846,582 @@ a:focus-visible {
     animation: none !important;
   }
 }
+
+/* Compact match-screen pass: dense decisions, prominent performance data. */
+
+.kit-shirt {
+  background: var(--kit-background);
+}
+
+.career-page {
+  width: min(1320px, calc(100% - 28px));
+  margin-top: 16px;
+}
+
+.matchday-strip {
+  min-height: 48px;
+  padding: 7px 13px;
+}
+
+.career-grid {
+  grid-template-columns: minmax(0, 1fr) 276px;
+  gap: 9px;
+  margin-top: 9px;
+}
+
+.story-panel,
+.player-panel,
+.season-panel {
+  border-radius: 17px 4px 17px 4px;
+}
+
+.story-panel {
+  min-height: 570px;
+  padding: clamp(24px, 3.2vw, 42px);
+}
+
+.story-index strong {
+  font-size: 40px;
+}
+
+.story-kicker {
+  margin-top: 34px;
+  font-size: 8px;
+}
+
+.story-panel h1 {
+  max-width: 720px;
+  margin-bottom: 12px;
+  font-size: clamp(32px, 4vw, 52px);
+  line-height: 0.98;
+}
+
+.story-copy {
+  max-width: 720px;
+  font-size: 14px;
+  line-height: 1.64;
+}
+
+.reality-teaser {
+  margin-top: 13px;
+  padding: 8px 10px;
+}
+
+.reality-teaser strong {
+  font-size: 9px;
+}
+
+.decision-rule {
+  margin: 20px 0 8px;
+}
+
+.choice-list {
+  gap: 7px;
+}
+
+.choice-card {
+  min-height: 128px;
+  padding: 11px;
+  grid-template-columns: 29px 1fr;
+  gap: 7px;
+  border-radius: 13px 3px 13px 3px;
+}
+
+.choice-letter {
+  width: 29px;
+  height: 29px;
+  border-radius: 8px 2px 8px 2px;
+  font-size: 9px;
+}
+
+.choice-body strong {
+  font-size: 12px;
+}
+
+.choice-body > span {
+  margin-top: 3px;
+  font-size: 9px;
+  line-height: 1.42;
+}
+
+.choice-card em {
+  font-size: 7px;
+}
+
+.player-panel,
+.season-panel {
+  padding: 11px;
+}
+
+.player-kit-card {
+  min-height: 126px;
+}
+
+.player-kit-card .team-kit-card {
+  transform: scale(0.8);
+}
+
+.player-identity {
+  padding: 10px 1px;
+}
+
+.player-identity h2 {
+  font-size: 21px;
+}
+
+.club-status-card {
+  margin-top: 10px;
+  padding: 10px;
+}
+
+.club-status-card > small {
+  margin-top: 7px;
+  font-size: 8px;
+}
+
+.ovr-block {
+  min-height: 154px;
+  border-radius: 17px;
+}
+
+.ovr-block > strong {
+  font-size: clamp(68px, 6.5vw, 92px);
+}
+
+.ovr-track {
+  margin-top: 11px;
+}
+
+.attribute-dashboard {
+  gap: 5px;
+}
+
+.attribute-dashboard > div {
+  min-height: 57px;
+  padding: 7px;
+}
+
+.attribute-dashboard strong {
+  font-size: 23px;
+}
+
+.big-stats > div {
+  min-height: 100px;
+  border-radius: 14px;
+}
+
+.big-stats strong {
+  font-size: clamp(38px, 4.4vw, 58px);
+}
+
+.big-stats span {
+  margin-top: 5px;
+  font-size: 9px;
+}
+
+.career-score-card {
+  padding: 10px 11px 14px;
+}
+
+.career-score-card strong {
+  font-size: 34px;
+}
+
+.offer-modal {
+  width: min(1180px, 100%);
+  padding: clamp(15px, 2.2vw, 26px);
+  border-radius: 23px;
+}
+
+.offer-modal-head {
+  margin-bottom: 14px;
+}
+
+.offer-modal-head h2 {
+  font-size: clamp(28px, 4vw, 48px);
+}
+
+.offer-player-score {
+  min-width: 92px;
+  padding: 9px 13px;
+}
+
+.offer-player-score strong {
+  font-size: 44px;
+}
+
+.contract-offer {
+  padding: 11px;
+  border-radius: 17px;
+}
+
+.offer-club-visual {
+  height: 126px;
+  margin: 7px 0;
+  border-radius: 13px;
+}
+
+.offer-club-visual .team-kit-card {
+  transform: scale(0.62);
+}
+
+.offer-club-visual .team-crest {
+  right: 8px;
+  bottom: 8px;
+}
+
+.offer-club-name {
+  margin: 3px 0;
+  font-size: clamp(17px, 1.8vw, 22px);
+}
+
+.contract-offer h3 {
+  margin: 11px 0 3px;
+  font-size: 13px;
+}
+
+.contract-offer > p {
+  min-height: 42px;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.offer-terms {
+  margin-top: 9px;
+}
+
+.offer-terms > span {
+  padding: 7px;
+}
+
+.offer-impact {
+  margin-top: 7px;
+  padding-top: 7px;
+}
+
+.resolution-backdrop {
+  align-items: flex-start;
+  padding: clamp(74px, 12vh, 130px) 14px 14px;
+  overflow: hidden;
+  background: rgba(4, 9, 18, 0.66);
+  backdrop-filter: blur(7px);
+}
+
+.resolution-modal {
+  width: min(660px, 100%);
+  max-height: none;
+  padding: 14px 16px 18px;
+  border-radius: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 7px 12px;
+  text-align: left;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  animation:
+    result-enter 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both,
+    result-leave 180ms 820ms ease-in both;
+}
+
+.resolution-modal > .overline,
+.resolution-modal > h2,
+.resolution-modal > .resolution-awards,
+.resolution-modal > .resolution-note,
+.resolution-modal > .auto-dismiss-track,
+.resolution-modal > .goal-celebration {
+  grid-column: 1 / -1;
+}
+
+.resolution-modal > .overline {
+  margin-bottom: 0;
+  color: var(--lime);
+  font-size: 7px;
+}
+
+.resolution-modal h2 {
+  margin: 0 0 3px;
+  font-size: clamp(23px, 4vw, 34px);
+}
+
+.resolution-ovr {
+  grid-column: 1;
+  grid-row: span 2;
+  gap: 7px;
+  min-height: 92px;
+  padding: 9px;
+  border-radius: 14px;
+}
+
+.resolution-ovr strong {
+  font-size: clamp(38px, 7vw, 58px);
+}
+
+.resolution-ovr > b {
+  min-width: 42px;
+  padding: 7px 5px;
+  border-radius: 10px;
+  font-size: 15px;
+  text-align: center;
+}
+
+.resolution-ovr .new-ovr {
+  min-height: 74px;
+  border-radius: 11px;
+  animation: ovr-pop 440ms 80ms cubic-bezier(0.18, 1.4, 0.32, 1) both;
+}
+
+.resolution-rating {
+  grid-column: 2;
+  margin: 0;
+  padding: 9px 10px 12px;
+}
+
+.resolution-rating strong {
+  font-size: 29px;
+}
+
+.resolution-stats {
+  grid-column: 2;
+  gap: 4px;
+  margin: 0;
+}
+
+.resolution-stats > div {
+  padding: 8px 4px;
+}
+
+.resolution-stats span {
+  font-size: 8px;
+}
+
+.resolution-stats strong {
+  font-size: 22px;
+}
+
+.attribute-gains {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  margin-top: 0;
+}
+
+.attribute-gains span {
+  padding: 4px 7px;
+  font-size: 8px;
+}
+
+.resolution-awards {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 211, 72, 0.45);
+  border-radius: 11px;
+  color: #ffd348;
+  background: rgba(255, 211, 72, 0.1);
+  animation: honour-pop 520ms cubic-bezier(0.18, 1.4, 0.32, 1) both;
+}
+
+.resolution-awards > span {
+  font-size: 23px;
+}
+
+.resolution-awards small,
+.resolution-awards strong {
+  display: block;
+}
+
+.resolution-awards small {
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 7px;
+}
+
+.resolution-awards strong {
+  font-size: 12px;
+}
+
+.resolution-note {
+  overflow: hidden;
+  max-width: none;
+  margin: 2px 0 0;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 9px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auto-dismiss-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: var(--lime);
+  transform-origin: left;
+  animation: auto-dismiss 1s linear both;
+}
+
+@keyframes auto-dismiss {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes result-leave {
+  to {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+}
+
+@keyframes honour-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.84);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.025);
+  }
+}
+
+@media (max-width: 720px) {
+  .career-page {
+    width: min(100% - 16px, 680px);
+    margin-top: 8px;
+  }
+
+  .matchday-strip {
+    min-height: 40px;
+  }
+
+  .story-panel {
+    min-height: auto;
+    padding: 18px 14px;
+  }
+
+  .story-kicker {
+    margin-top: 20px;
+  }
+
+  .story-panel h1 {
+    font-size: clamp(28px, 9vw, 39px);
+  }
+
+  .story-copy {
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .choice-list {
+    grid-template-columns: 1fr;
+  }
+
+  .choice-card {
+    min-height: 78px;
+    padding: 9px;
+    grid-template-columns: 27px minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+  }
+
+  .choice-letter {
+    width: 27px;
+    height: 27px;
+  }
+
+  .choice-body > span {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .choice-card em {
+    grid-column: 2;
+  }
+
+  .offer-modal {
+    padding: 14px 9px calc(15px + env(safe-area-inset-bottom));
+  }
+
+  .offer-modal-head h2 {
+    font-size: 26px;
+  }
+
+  .contract-offer {
+    grid-template-columns: 86px minmax(0, 1fr);
+    padding: 9px;
+  }
+
+  .offer-club-visual {
+    width: 86px;
+    height: 126px;
+  }
+
+  .offer-club-name {
+    font-size: 18px;
+  }
+
+  .contract-offer > p {
+    display: -webkit-box;
+    overflow: hidden;
+    min-height: 0;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .resolution-backdrop {
+    align-items: flex-start;
+    padding: max(70px, env(safe-area-inset-top)) 8px 8px;
+  }
+
+  .resolution-modal {
+    width: min(100%, 560px);
+    max-height: none;
+    overflow: hidden;
+    padding: 12px 12px 16px;
+    border-radius: 16px;
+    grid-template-columns: minmax(0, 1fr) 148px;
+  }
+
+  .resolution-ovr .new-ovr {
+    min-height: 67px;
+  }
+
+  .resolution-note {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .resolution-modal {
+    grid-template-columns: 1fr;
+  }
+
+  .resolution-ovr,
+  .resolution-rating,
+  .resolution-stats {
+    grid-column: 1;
+  }
+
+  .resolution-ovr {
+    grid-row: auto;
+  }
+
+  .resolution-rating {
+    display: none;
+  }
+
+  .resolution-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resolution-modal {
+    animation: none !important;
+  }
+
+  .auto-dismiss-track {
+    animation: auto-dismiss 1s linear both !important;
+  }
+}
