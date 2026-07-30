@@ -91,6 +91,10 @@ type GameState = {
   reputation: number;
   rating: number;
   peakOvr: number;
+  injuryLoad: number;
+  injuries: { age: number; label: string; severity: InjurySeverity }[];
+  retiredAge: number | null;
+  retirementReason: string;
   careerSeed: number;
   build: AttributeMap;
   attributes: AttributeMap;
@@ -98,6 +102,18 @@ type GameState = {
   seasonAwards: { age: number; year: number; items: string[] }[];
   pendingCameoId?: string | null;
   history: { age: number; title: string; note: string }[];
+};
+
+type InjurySeverity = "none" | "minor" | "major" | "critical";
+
+type InjuryOutcome = {
+  severity: InjurySeverity;
+  label: string;
+  description: string;
+  load: number;
+  appsLost: number;
+  ovrPenalty: number;
+  careerEnding: boolean;
 };
 
 type ContractOffer = {
@@ -129,6 +145,9 @@ type Resolution = {
   advanceAfter: boolean;
   goalBurst: boolean;
   awards: string[];
+  injury?: InjuryOutcome;
+  retireAfter?: boolean;
+  retirementReason?: string;
 };
 
 const origins = [
@@ -696,6 +715,177 @@ function randomBetween(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+const noInjury: InjuryOutcome = {
+  severity: "none",
+  label: "身体无碍",
+  description: "完整参加了本赛季。",
+  load: 0,
+  appsLost: 0,
+  ovrPenalty: 0,
+  careerEnding: false,
+};
+
+function rollSeasonInjury(
+  game: GameState,
+  choice: Choice,
+  currentAge: number,
+): InjuryOutcome {
+  const energyCost = Math.max(0, -(choice.effects.energy ?? 0));
+  const riskLanguage = `${choice.eyebrow}${choice.title}${choice.copy}${choice.impact}`;
+  const riskyChoice = /冒险|加练|豪赌|硬撑|带伤|拼命|孤注一掷|冲撞|拒绝休息/.test(
+    riskLanguage,
+  );
+  const probability = Math.min(
+    0.68,
+    0.055 +
+      energyCost * 0.012 +
+      (riskyChoice ? 0.075 : 0) +
+      Math.max(0, 55 - game.energy) * 0.004 +
+      game.injuryLoad * 0.0022 +
+      Math.max(0, currentAge - 29) * 0.014,
+  );
+  if (Math.random() >= probability) return noInjury;
+
+  const severityRoll =
+    Math.random() +
+    Math.max(0, currentAge - 31) * 0.012 +
+    game.injuryLoad * 0.0015;
+  if (severityRoll < 0.61) {
+    return {
+      severity: "minor",
+      label: "肌肉拉伤",
+      description: "缺席数周，赛季节奏被打断。",
+      load: 12,
+      appsLost: randomBetween(2, 5),
+      ovrPenalty: -1,
+      careerEnding: false,
+    };
+  }
+  if (severityRoll < 0.91) {
+    return {
+      severity: "major",
+      label: "韧带重伤",
+      description: "长期缺阵，恢复后的爆发力受到影响。",
+      load: 30,
+      appsLost: randomBetween(9, 17),
+      ovrPenalty: -2,
+      careerEnding: false,
+    };
+  }
+  const careerEndingChance = Math.min(
+    0.82,
+    0.28 + Math.max(0, currentAge - 25) * 0.025 + game.injuryLoad * 0.004,
+  );
+  const careerEnding = Math.random() < careerEndingChance;
+  return {
+    severity: "critical",
+    label: careerEnding ? "生涯终结性重伤" : "严重复合伤",
+    description: careerEnding
+      ? "医疗团队确认身体已无法继续承受职业比赛。"
+      : "赛季提前结束，职业寿命遭到重创。",
+    load: 55,
+    appsLost: 28,
+    ovrPenalty: -4,
+    careerEnding,
+  };
+}
+
+function calculateSeasonGrowth({
+  age: currentAge,
+  game,
+  choice,
+  goals,
+  assists,
+  goalMax,
+  assistMax,
+}: {
+  age: number;
+  game: GameState;
+  choice: Choice;
+  goals: number;
+  assists: number;
+  goalMax: number;
+  assistMax: number;
+}) {
+  const choiceSignal = choice.effects.ovr ?? 0;
+  const performance =
+    goals / Math.max(1, goalMax) + assists / Math.max(1, assistMax);
+  const eliteSeason = performance >= 1.25;
+  const roll = Math.random();
+
+  if (currentAge < 28) {
+    if (roll < 0.7) {
+      const ceiling = eliteSeason ? 4 : 3;
+      return Math.min(
+        game.ovr >= 92 ? 1 : ceiling,
+        randomBetween(1, eliteSeason ? 3 : 2) +
+          (choiceSignal >= 4 ? 1 : 0),
+      );
+    }
+    return -randomBetween(1, choiceSignal < 0 ? 3 : 2);
+  }
+
+  const growthChance =
+    (currentAge <= 30 ? 0.12 : currentAge <= 33 ? 0.07 : 0.025) +
+    (eliteSeason ? 0.055 : 0) +
+    (choiceSignal >= 4 ? 0.02 : 0);
+  const flatChance = currentAge <= 31 ? 0.28 : currentAge <= 34 ? 0.2 : 0.12;
+  if (roll < growthChance) {
+    return eliteSeason && currentAge <= 30 ? randomBetween(1, 2) : 1;
+  }
+  if (roll < growthChance + flatChance) return 0;
+  return -randomBetween(1, currentAge >= 34 ? 3 : 2);
+}
+
+function evaluateRetirement(
+  currentAge: number,
+  afterOvr: number,
+  injury: InjuryOutcome,
+) {
+  if (injury.careerEnding) {
+    return {
+      retire: true,
+      reason: `${injury.label}迫使你在 ${currentAge} 岁立即挂靴。`,
+    };
+  }
+  if (currentAge >= 42) {
+    return {
+      retire: true,
+      reason: "身体已经完成最后一个完整赛季，你选择在掌声中退役。",
+    };
+  }
+  if (currentAge < 33) return { retire: false, reason: "" };
+
+  const yearsPast33 = currentAge - 33;
+  const baseChance =
+    afterOvr < 65
+      ? 0.72
+      : afterOvr < 80
+        ? 0.48
+        : afterOvr < 85
+          ? 0.09
+          : 0.025;
+  const yearlyRise =
+    afterOvr < 80 ? yearsPast33 * 0.13 : yearsPast33 * 0.055;
+  if (Math.random() < Math.min(0.96, baseChance + yearlyRise)) {
+    return {
+      retire: true,
+      reason:
+        afterOvr < 80
+          ? `${currentAge} 岁时，竞技水平与恢复速度已不足以支撑下一个赛季。`
+          : `${currentAge} 岁时，你判断身体已无法继续保持顶级输出。`,
+    };
+  }
+  return { retire: false, reason: "" };
+}
+
+function getMedicalStatus(injuryLoad: number) {
+  if (injuryLoad >= 75) return { label: "高危", tone: "critical" };
+  if (injuryLoad >= 45) return { label: "脆弱", tone: "major" };
+  if (injuryLoad >= 20) return { label: "观察", tone: "minor" };
+  return { label: "健康", tone: "fit" };
+}
+
 function shuffled<T>(items: T[]) {
   return [...items].sort(() => Math.random() - 0.5);
 }
@@ -786,6 +976,10 @@ const baseState: GameState = {
   reputation: 4,
   rating: 6.5,
   peakOvr: 46,
+  injuryLoad: 0,
+  injuries: [],
+  retiredAge: null,
+  retirementReason: "",
   careerSeed: 2026,
   build: { ...emptyBuild },
   attributes: { ...baseAttributes },
@@ -842,7 +1036,8 @@ export default function Home() {
     () => getCareerChapter(chapters[game.chapter], game.careerSeed, game.chapter),
     [game.chapter, game.careerSeed],
   );
-  const age = game.phase === "ending" ? 43 : current?.age ?? 14;
+  const finalAge = game.retiredAge ?? chapters.at(-1)?.age ?? 42;
+  const age = game.phase === "ending" ? finalAge : current?.age ?? 14;
   const progress =
     game.phase === "setup"
       ? 0
@@ -877,6 +1072,11 @@ export default function Home() {
       game.goals * 0.015 +
       game.assists * 0.02 +
       game.trust * 0.1;
+    if (game.retirementReason.includes("重伤"))
+      return {
+        label: "命运吹响终场哨",
+        copy: "伤病提前结束了比赛，却带不走你已经留下的进球、掌声和名字。",
+      };
     if (score >= 165)
       return {
         label: "世界级传奇",
@@ -944,6 +1144,10 @@ export default function Home() {
       attributes: nextAttributes,
       ovr: startingOvr,
       peakOvr: startingOvr,
+      injuryLoad: 0,
+      injuries: [],
+      retiredAge: null,
+      retirementReason: "",
       careerSeed:
         Math.floor(Math.random() * 1000000) +
         hashCareer(`${game.name}-${game.position}`),
@@ -990,30 +1194,42 @@ export default function Home() {
       CB: [0, 4],
       GK: [0, 2],
     };
-    const apps =
+    const scheduledApps =
       current.age < 16
         ? Math.max(choice.effects.apps ?? 0, randomBetween(3, 10))
         : Math.max(choice.effects.apps ?? 0, randomBetween(18, 40));
     const [goalMin, goalMax] = attackingGoalRange[game.position];
     const [assistMin, assistMax] = assistRange[game.position];
-    const goals = Math.max(
+    const scheduledGoals = Math.max(
       choice.effects.goals ?? 0,
       randomBetween(goalMin, goalMax) +
         Math.floor((game.attributes.luck - 50) / 18),
     );
-    const assists = Math.max(
+    const scheduledAssists = Math.max(
       choice.effects.assists ?? 0,
       randomBetween(assistMin, assistMax) +
         Math.floor((game.attributes.iq - 50) / 20),
     );
-    const ageCurve =
-      current.age <= 22 ? 1 : current.age >= 34 ? randomBetween(-3, 0) : 0;
+    const injury = rollSeasonInjury(game, choice, current.age);
+    const availability = Math.max(
+      0,
+      (scheduledApps - injury.appsLost) / Math.max(1, scheduledApps),
+    );
+    const apps = Math.max(0, scheduledApps - injury.appsLost);
+    const goals = Math.max(0, Math.round(scheduledGoals * availability));
+    const assists = Math.max(0, Math.round(scheduledAssists * availability));
+    const formDelta = calculateSeasonGrowth({
+      age: current.age,
+      game,
+      choice,
+      goals,
+      assists,
+      goalMax,
+      assistMax,
+    });
     const ovrDelta = Math.max(
-      -5,
-      Math.min(
-        game.ovr >= 93 ? 1 : 5,
-        (choice.effects.ovr ?? 1) + randomBetween(-1, 1) + ageCurve,
-      ),
+      -6,
+      Math.min(4, formDelta + injury.ovrPenalty),
     );
     const firstAttribute =
       attributes[
@@ -1025,10 +1241,21 @@ export default function Home() {
         (choice.copy.length + game.chapter * 3 + game.careerSeed) %
           attributes.length
       ].id;
-    const attributeDeltas: Partial<AttributeMap> = {
-      [firstAttribute]: current.age >= 36 ? randomBetween(-2, 1) : randomBetween(1, 2),
-      [secondAttribute]: current.age >= 34 ? randomBetween(-1, 1) : 1,
-    };
+    const attributeDeltas: Partial<AttributeMap> =
+      ovrDelta > 0
+        ? {
+            [firstAttribute]: randomBetween(1, Math.min(2, ovrDelta)),
+            [secondAttribute]: 1,
+          }
+        : ovrDelta < 0
+          ? {
+              [firstAttribute]: -randomBetween(
+                1,
+                Math.min(2, Math.abs(ovrDelta)),
+              ),
+              [secondAttribute]: injury.severity === "critical" ? -2 : -1,
+            }
+          : {};
     const rating = Math.min(
       10,
       Math.max(
@@ -1039,7 +1266,12 @@ export default function Home() {
             goals * 0.08 +
             assists * 0.07 +
             ovrDelta * 0.16 +
-            randomBetween(-4, 8) / 10
+            randomBetween(-4, 8) / 10 -
+            (injury.severity === "major"
+              ? 0.6
+              : injury.severity === "critical"
+                ? 1.2
+                : 0)
           ).toFixed(1),
         ),
       ),
@@ -1053,6 +1285,12 @@ export default function Home() {
     };
     const beforeOvr = game.ovr;
     const afterOvr = clamp(beforeOvr + ovrDelta);
+    const nextInjuryLoad = clamp(
+      game.injuryLoad +
+        injury.load -
+        (injury.severity === "none" ? randomBetween(8, 15) : 0),
+    );
+    const retirement = evaluateRetirement(current.age, afterOvr, injury);
     const seasonYear = Number.parseInt(current.year.slice(0, 4), 10);
     const awards = evaluateSeasonAwards({
       age: current.age,
@@ -1092,6 +1330,21 @@ export default function Home() {
       });
       next.rating = rating;
       next.peakOvr = Math.max(next.peakOvr, next.ovr);
+      next.injuryLoad = nextInjuryLoad;
+      if (injury.severity !== "none") {
+        next.injuries = [
+          ...next.injuries,
+          {
+            age: current.age,
+            label: injury.label,
+            severity: injury.severity,
+          },
+        ];
+      }
+      if (retirement.retire) {
+        next.retiredAge = current.age;
+        next.retirementReason = retirement.reason;
+      }
       if (earned.length) next.trophies = [...next.trophies, ...earned];
       next.seasonAwards = [
         ...next.seasonAwards,
@@ -1101,25 +1354,40 @@ export default function Home() {
         ...next.history,
         {
           age: current.age,
-          title: choice.title,
-          note: awards.length
-            ? `${choice.note} 赛季荣誉：${awards.join("、")}。`
-            : choice.note,
+          title: retirement.retire
+            ? `${choice.title} · 宣布退役`
+            : injury.severity !== "none"
+              ? `${choice.title} · ${injury.label}`
+              : choice.title,
+          note: `${choice.note}${
+            injury.severity !== "none" ? ` ${injury.description}` : ""
+          }${awards.length ? ` 赛季荣誉：${awards.join("、")}。` : ""}${
+            retirement.retire ? ` ${retirement.reason}` : ""
+          }`,
         },
       ];
       return next;
     });
-    setQueuedCameoId(upcomingCameo?.id ?? null);
+    setQueuedCameoId(retirement.retire ? null : upcomingCameo?.id ?? null);
     setResolution({
       kind: "season",
-      title: earned.length
-        ? "荣誉解锁"
-        : rating >= 8.5
-          ? "赛季封神"
-          : rating >= 7.5
-            ? "强势成长"
-            : "赛季结算",
-      note: choice.note,
+      title: retirement.retire
+        ? injury.careerEnding
+          ? "重伤退役"
+          : "终场哨响"
+        : injury.severity === "critical" || injury.severity === "major"
+          ? "伤病警报"
+          : earned.length
+            ? "荣誉解锁"
+            : ovrDelta > 0
+              ? "能力成长"
+              : ovrDelta < 0
+                ? "状态下滑"
+                : "赛季结算",
+      note:
+        injury.severity !== "none"
+          ? `${injury.description}${retirement.retire ? ` ${retirement.reason}` : ""}`
+          : choice.note,
       beforeOvr,
       afterOvr,
       rating,
@@ -1132,6 +1400,7 @@ export default function Home() {
       },
       attributeDeltas,
       offerAfter:
+        !retirement.retire &&
         current.age >= 16 &&
         current.age <= 38 &&
         (current.age % 2 === 0 ||
@@ -1139,6 +1408,9 @@ export default function Home() {
       advanceAfter: true,
       goalBurst: goals > 0,
       awards: earned,
+      injury,
+      retireAfter: retirement.retire,
+      retirementReason: retirement.reason,
     });
   };
 
@@ -1146,11 +1418,19 @@ export default function Home() {
     const found = findClub(offer.clubId);
     if (!found || resolution) return;
     const beforeOvr = game.ovr;
-    const ovrDelta = offer.effects.ovr ?? 0;
+    const quotedOvrDelta = offer.effects.ovr ?? 0;
+    const ovrDelta =
+      age >= 28 && quotedOvrDelta > 0
+        ? game.rating >= 8.5 &&
+          hashCareer(`${game.careerSeed}-${age}-${offer.id}`) % 100 < 8
+          ? 1
+          : 0
+        : quotedOvrDelta;
+    const effectiveEffects = { ...offer.effects, ovr: ovrDelta };
     setPendingOffers([]);
     setGame((prev) => {
       const next = { ...prev };
-      Object.entries(offer.effects).forEach(([key, amount]) => {
+      Object.entries(effectiveEffects).forEach(([key, amount]) => {
         const stat = key as StatKey;
         const raw = (next[stat] as number) + (amount ?? 0);
         next[stat] =
@@ -1201,6 +1481,21 @@ export default function Home() {
     if (!resolution) return;
     const resolved = resolution;
     setResolution(null);
+    if (resolved.retireAfter) {
+      setPendingOffers([]);
+      setQueuedCameoId(null);
+      setGame((prev) => ({
+        ...prev,
+        phase: "ending",
+        pendingCameoId: null,
+        retiredAge: prev.retiredAge ?? age,
+        retirementReason:
+          prev.retirementReason ||
+          resolved.retirementReason ||
+          `${age} 岁时结束职业生涯。`,
+      }));
+      return;
+    }
     if (resolved.offerAfter) {
       setOfferContext("season");
       setPendingOffers(createContractOffers(game));
@@ -1224,10 +1519,18 @@ export default function Home() {
   const chooseCameo = (choice: CameoChoice) => {
     if (!activeCameo || resolution) return;
     const beforeOvr = game.ovr;
-    const ovrDelta = choice.effects.ovr ?? 0;
+    const quotedOvrDelta = choice.effects.ovr ?? 0;
+    const ovrDelta =
+      age >= 28 && quotedOvrDelta > 0
+        ? game.rating >= 8.7 &&
+          hashCareer(`${game.careerSeed}-${age}-${choice.title}`) % 100 < 8
+          ? 1
+          : 0
+        : quotedOvrDelta;
+    const effectiveEffects = { ...choice.effects, ovr: ovrDelta };
     setGame((prev) => {
       const next = { ...prev } as GameState;
-      Object.entries(choice.effects).forEach(([key, amount]) => {
+      Object.entries(effectiveEffects).forEach(([key, amount]) => {
         const stat = key as StatKey;
         const raw = (next[stat] as number) + (amount ?? 0);
         next[stat] =
@@ -1630,6 +1933,15 @@ export default function Home() {
                 <Meter label="士气" value={game.morale} />
               </div>
 
+              <div
+                className={`medical-card medical-${getMedicalStatus(game.injuryLoad).tone}`}
+              >
+                <span>MED</span>
+                <strong>{100 - game.injuryLoad}</strong>
+                <small>{getMedicalStatus(game.injuryLoad).label}</small>
+                <b>{game.injuries.length} 次伤病</b>
+              </div>
+
               <div className="market-card">
                 <span>当前身价</span>
                 <strong>
@@ -1778,9 +2090,12 @@ export default function Home() {
         <main className="ending-page">
           <section className="ending-hero">
             <p className="overline">FINAL WHISTLE · 生涯档案已封存</p>
-            <span className="ending-age">43</span>
+            <span className="ending-age">{finalAge}</span>
             <h1>{ending.label}</h1>
             <p>{ending.copy}</p>
+            <strong className="retirement-reason">
+              {finalAge} 岁退役 · {game.retirementReason}
+            </strong>
           </section>
 
           <section className="career-record" data-testid="career-record">
@@ -1825,7 +2140,7 @@ export default function Home() {
             </div>
             <div className="record-body">
               <div className="record-timeline">
-                <h3>二十九个决定，一整段人生</h3>
+                <h3>{Math.max(1, game.history.length - 1)} 个决定，一整段人生</h3>
                 {game.history.map((item, index) => (
                   <article key={`${item.age}-${index}`}>
                     <span>{item.age} 岁</span>
@@ -1946,6 +2261,7 @@ export default function Home() {
                 const found = findClub(offer.clubId);
                 if (!found) return null;
                 const ovrChange = offer.effects.ovr ?? 0;
+                const lateCareerGrowth = age >= 28 && ovrChange > 0;
                 return (
                   <button
                     key={offer.id}
@@ -1980,8 +2296,9 @@ export default function Home() {
                     </div>
                     <div className="offer-impact">
                       <strong className={ovrChange >= 0 ? "positive" : "negative"}>
-                        OVR {ovrChange >= 0 ? "+" : ""}
-                        {ovrChange}
+                        {lateCareerGrowth
+                          ? "OVR 小概率 +1"
+                          : `OVR ${ovrChange >= 0 ? "+" : ""}${ovrChange}`}
                       </strong>
                       <span>{offer.risk}</span>
                     </div>
@@ -2028,6 +2345,20 @@ export default function Home() {
                 <div>
                   <small>新荣誉</small>
                   <strong>{resolution.awards.slice(0, 2).join(" · ")}</strong>
+                </div>
+              </div>
+            )}
+            {resolution.injury && resolution.injury.severity !== "none" && (
+              <div
+                className={`resolution-injury injury-${resolution.injury.severity}`}
+                aria-label="伤病通报"
+              >
+                <span aria-hidden="true">✚</span>
+                <div>
+                  <small>
+                    {resolution.retireAfter ? "CAREER ENDING" : "MEDICAL REPORT"}
+                  </small>
+                  <strong>{resolution.injury.label}</strong>
                 </div>
               </div>
             )}
